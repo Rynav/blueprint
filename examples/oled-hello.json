@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "notes": [
+    {
+      "id": "note-title",
+      "at": { "x": 0, "y": -150 },
+      "text": "OLED HELLO WORLD\n\nPaste the Adafruit_SSD1306 sketch from the README, then press Run.\n\nThe display sits on the I2C bus (SDA = A4, SCL = A5). This is the real Adafruit library running against a simulated SSD1306 - the pixels you see are what the chip was actually told to draw.",
+      "color": "#fde68a"
+    },
+    {
+      "id": "note-i2c",
+      "at": { "x": 340, "y": 130 },
+      "text": "SSD1306 at address 0x3C\nSDA -> A4\nSCL -> A5\nVCC -> 5V rail\nGND -> GND rail\n\nRequires Adafruit_GFX + Adafruit_SSD1306.",
+      "color": "#a7f3d0"
+    }
+  ],
+  "parts": [
+    { "id": "uno", "def": "arduino-uno", "at": { "x": 0, "y": 0 }, "label": "I2C master" },
+    { "id": "oled", "def": "ssd1306-oled", "at": { "x": 360, "y": 0 } },
+    { "id": "vcc", "def": "rail-5v", "at": { "x": 300, "y": 180 } },
+    { "id": "gnd", "def": "rail-gnd", "at": { "x": 360, "y": 180 } }
+  ],
+  "wires": [
+    { "id": "w-sda", "from": { "part": "uno", "pin": "a4" }, "to": { "part": "oled", "pin": "sda" }, "color": "#22c55e", "label": "SDA" },
+    { "id": "w-scl", "from": { "part": "uno", "pin": "a5" }, "to": { "part": "oled", "pin": "scl" }, "color": "#3b82f6", "label": "SCL" },
+    { "id": "w-vcc", "from": { "part": "vcc", "pin": "5V" }, "to": { "part": "oled", "pin": "vcc" }, "color": "#ef4444" },
+    { "id": "w-gnd", "from": { "part": "gnd", "pin": "GND" }, "to": { "part": "oled", "pin": "gnd" }, "color": "#64748b" }
+  ]
+}

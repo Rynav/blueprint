@@ -2,6 +2,7 @@ import { createAvrRuntime, type AvrRuntime } from '@/lib/avr/runtime'
 import { simulate, type CircuitState } from '@/lib/circuit'
 import { compileSketchInline } from '@/lib/compile'
 import { createDeviceHarness } from '@/lib/devices'
+import { createI2cBus } from '@/lib/devices/i2c'
 import { feedbackFromCircuit } from '@/lib/inputs'
 import { allPartDefs } from '@/lib/parts'
 import { parse } from '@/lib/persist'
@@ -31,19 +32,20 @@ interface Scene {
   defs: Map<string, PartDef>
 }
 
-async function openDiagram(diagram: Diagram, source: string): Promise<Scene> {
+async function openDiagram(diagram: Diagram, source: string, sensors?: string[]): Promise<Scene> {
   const board = diagram.parts.find((p) => defs.get(p.def)?.mcu)
   if (!board) throw new Error('diagram has no board')
   const def = defs.get(board.def)
   if (!def) throw new Error('diagram references an unknown board')
-  const runtime = createAvrRuntime(board, def)
-  const { hex } = await compileSketchInline(source)
+  const state = new Map<string, Record<string, unknown>>()
+  const runtime = createAvrRuntime(board, def, { i2c: createI2cBus(diagram, defs, state) })
+  const { hex } = await compileSketchInline(source, undefined, sensors)
   runtime.load(hex)
-  return { diagram, boardId: board.id, runtime, state: new Map(), defs }
+  return { diagram, boardId: board.id, runtime, state, defs }
 }
 
-async function open(jsonPath: string, source: string): Promise<Scene> {
-  return openDiagram(parse(await Bun.file(jsonPath).text()), source)
+async function open(jsonPath: string, source: string, sensors?: string[]): Promise<Scene> {
+  return openDiagram(parse(await Bun.file(jsonPath).text()), source, sensors)
 }
 
 /** Exactly the app's frame ordering. */
@@ -199,6 +201,58 @@ void loop() { delay(100); }
   ok('fade: analogWrite(9, 0) leaves the LED dark', off < 0.02)
   ok('fade: analogWrite(9, 255) lights it fully', full > 0.5)
   ok('fade: half duty dims the LED', half > 0.02 && half < full)
+}
+
+// ------------------------------------------------- Adafruit_SSD1306 over I2C
+// The toolchain only links the OLED object group when it is requested, and a part declares
+// that need. Proves the sensors plumbing and the I2C bus in one go.
+{
+  const oledSketch = `#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+Adafruit_SSD1306 display(128, 64, &Wire, -1);
+
+void setup() {
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(F("BLUEPRINT"));
+  display.display();
+}
+
+void loop() {
+  delay(100);
+}
+`
+  const scene = await open('examples/oled-hello.json', oledSketch, ['OLED'])
+  checkFile('oled-hello', scene.diagram)
+  let circuit!: CircuitState
+  for (let i = 0; i < 40; i++) circuit = step(scene)
+
+  const oledDef = defs.get('ssd1306-oled')!
+  const bag = scene.state.get('oled') ?? {}
+  const fb = (oledDef.device!.visual!(bag).data as { fb: Uint8Array }).fb
+  let lit = 0
+  for (const byte of fb) for (let b = 0; b < 8; b++) if (byte & (1 << b)) lit++
+
+  console.log(`\n  Adafruit_SSD1306 "BLUEPRINT" -> ${lit} lit pixels of ${fb.length * 8}\n`)
+
+  ok('oled: the circuit converges with the display attached', circuit.converged)
+  ok('oled: the sketch painted text onto the framebuffer', lit > 50)
+  ok('oled: it did not fill the whole panel', lit < fb.length * 4)
+
+  // Without the part declaring its link group the sketch cannot link at all, so the
+  // declarative `sensors` field is load-bearing rather than cosmetic.
+  let linkedWithoutSensors = true
+  try {
+    await compileSketchInline(oledSketch)
+  } catch {
+    linkedWithoutSensors = false
+  }
+  ok('oled: the Adafruit library does NOT link unless the part declares its group', !linkedWithoutSensors)
 }
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
