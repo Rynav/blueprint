@@ -36,6 +36,7 @@ export interface DiagramStore {
   rotateSelection: () => void
   deleteSelection: () => void
   setPartLabel: (id: string, label: string) => void
+  setPartParam: (id: string, key: string, value: number) => void
 
   addWire: (from: Endpoint, to: Endpoint) => string | undefined
   setWireLabel: (id: string, label: string) => void
@@ -177,6 +178,16 @@ export const useDiagram = create<DiagramStore>((set, get) => ({
       diagram: {
         ...s.diagram,
         parts: s.diagram.parts.map((p) => (p.id === id ? { ...p, label } : p)),
+      },
+    })),
+
+  setPartParam: (id, key, value) =>
+    set((s) => ({
+      diagram: {
+        ...s.diagram,
+        parts: s.diagram.parts.map((p) =>
+          p.id === id ? { ...p, params: { ...p.params, [key]: value } } : p,
+        ),
       },
     })),
 

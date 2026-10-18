@@ -14,6 +14,22 @@ import { useDiagram } from '@/store/diagram'
 /** Preset swatches shared by notes and wires. */
 const COLORS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#64748b']
 
+/**
+ * Labels and units for known parameter keys.
+ * shortcut: hardcoded here because params are a bare Record<string, number>;
+ * move this into PartDef once params need ranges, choices or validation.
+ */
+const PARAM_META: Record<string, { label: string; unit?: string; step?: number; min?: number }> = {
+  ohms: { label: 'Resistance', unit: 'Ω', step: 10, min: 0 },
+  vf: { label: 'Forward voltage', unit: 'V', step: 0.1, min: 0 },
+  gain: { label: 'Current gain', step: 10, min: 1 },
+  vth: { label: 'Threshold', unit: 'V', step: 0.1 },
+  beta: { label: 'Beta', step: 10 },
+  temperatureC: { label: 'Temperature', unit: '°C', step: 1 },
+  position: { label: 'Position', step: 0.05, min: 0 },
+  pressed: { label: 'Pressed (1/0)', step: 1, min: 0 },
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block space-y-1">
@@ -121,6 +137,7 @@ function ProjectPanel({ diagram }: { diagram: Diagram }) {
 function PartPanel({ part }: { part: PartInstance }) {
   const def = getPartDef(part.def)
   const setPartLabel = useDiagram((s) => s.setPartLabel)
+  const setPartParam = useDiagram((s) => s.setPartParam)
   const rotateSelection = useDiagram((s) => s.rotateSelection)
   const deleteSelection = useDiagram((s) => s.deleteSelection)
   const pushHistory = useDiagram((s) => s.pushHistory)
@@ -148,6 +165,34 @@ function PartPanel({ part }: { part: PartInstance }) {
           Rotate
         </Button>
       </div>
+      {def?.defaultParams ? (
+        <div className="space-y-1.5">
+          <p className="text-[10px] tracking-widest text-muted-foreground uppercase">Parameters</p>
+          {Object.entries(def.defaultParams).map(([key, fallback]) => {
+            const meta = PARAM_META[key] ?? { label: key }
+            return (
+              <label key={key} className="flex items-center gap-2">
+                <span className="w-28 shrink-0 text-[10px] text-muted-foreground">
+                  {meta.label}
+                  {meta.unit ? ` (${meta.unit})` : ''}
+                </span>
+                <input
+                  type="number"
+                  value={part.params?.[key] ?? fallback}
+                  step={meta.step ?? 1}
+                  min={meta.min}
+                  onFocus={() => pushHistory()}
+                  onChange={(e) => {
+                    const value = Number(e.target.value)
+                    if (Number.isFinite(value)) setPartParam(part.id, key, value)
+                  }}
+                  className="h-7 w-full rounded-md border border-input bg-transparent px-2 font-mono text-xs outline-none focus-visible:border-ring"
+                />
+              </label>
+            )
+          })}
+        </div>
+      ) : null}
       <Separator />
       <div className="flex min-h-0 flex-1 flex-col">
         <p className="mb-1 text-[10px] tracking-widest text-muted-foreground uppercase">Pins</p>
