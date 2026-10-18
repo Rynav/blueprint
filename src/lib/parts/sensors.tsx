@@ -1,3 +1,5 @@
+import { clamp01, inCircle, roundTo } from '@/lib/controls'
+import { hcSr04 as hcSr04Device } from '@/lib/devices/hc-sr04'
 import { stepper } from '@/lib/devices/stepper'
 import type { PartDef } from '@/lib/types'
 import { ACCENT, BODY, BODY_DARK, DIM, LINE, Pads, TEXT, Txt } from './shared'
@@ -90,7 +92,14 @@ export const uln2003: PartDef = {
 
 // Analog joystick (KY-023 class): two potentiometers on X/Y plus a push switch, brought out
 // to a 5-pin header. The dome is nudged by x/y so the stick's position reads on the canvas.
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+// Operated by dragging the stick inside the gimbal well; a control change carries one
+// parameter, so each gesture drives the axis it leans on most (x: left 0 -> right 1, y: up
+// 0 -> down 1, the sense circuit.ts solves), and a release re-centres the off-centre axis.
+// shortcut: one axis per gesture; a truly 2-D stick needs ControlChange to carry both, which
+// the frozen type does not allow. Upgrade when the gesture contract gains a second value.
+const STICK = { x: 45, y: 36 }
+const WELL_R = 26
+const STICK_DEAD = 4
 
 export const joystick: PartDef = {
   id: 'joystick',
@@ -106,9 +115,40 @@ export const joystick: PartDef = {
     { id: 'sw', label: 'SW', x: 76, y: 90, kind: 'io' },
   ],
   defaultParams: { x: 0.5, y: 0.5, pressed: 0 },
+  control: ({ part, def, local, phase }) => {
+    const cur = (axis: 'x' | 'y') => clamp01(part.params?.[axis] ?? def.defaultParams?.[axis] ?? 0.5)
+    if (phase === 'up') {
+      // Self-centring: a real stick springs back, so both axes return together.
+      const back = []
+      if (cur('x') !== 0.5) back.push({ param: 'x', value: 0.5 })
+      if (cur('y') !== 0.5) back.push({ param: 'y', value: 0.5 })
+      return back.length > 0 ? back : null
+    }
+    const dx = local.x - STICK.x
+    const dy = local.y - STICK.y
+    const d = Math.hypot(dx, dy)
+    if (phase === 'down' && !inCircle(local, { ...STICK, r: WELL_R })) return null
+    if (d <= STICK_DEAD) {
+      // Dead zone: the stick is at rest, and claiming the gesture is what makes a `down`
+      // here operate the stick rather than drag the part.
+      return [
+        { param: 'x', value: 0.5 },
+        { param: 'y', value: 0.5 },
+      ]
+    }
+    const eff = Math.min(1, (d - STICK_DEAD) / (WELL_R - STICK_DEAD))
+    const ux = (dx / d) * eff
+    const uy = (dy / d) * eff
+    // Both axes in one gesture: a diagonal drag is one movement, not two.
+    return [
+      { param: 'x', value: roundTo(clamp01(0.5 + 0.5 * ux)) },
+      { param: 'y', value: roundTo(clamp01(0.5 + 0.5 * uy)) },
+    ]
+  },
   render: ({ def, part }) => {
     const x = clamp01(part.params?.x ?? def.defaultParams?.x ?? 0.5)
     const y = clamp01(part.params?.y ?? def.defaultParams?.y ?? 0.5)
+    const pressed = (part.params?.pressed ?? def.defaultParams?.pressed ?? 0) === 1
     const cx = 45 + (x - 0.5) * 16
     const cy = 36 + (y - 0.5) * 16
     return (
@@ -116,8 +156,14 @@ export const joystick: PartDef = {
         <rect x={2} y={2} width={86} height={72} rx={4} fill={BODY} stroke={LINE} strokeWidth={1.4} />
         <rect x={8} y={74} width={74} height={12} rx={2} fill={BODY_DARK} stroke={LINE} strokeWidth={1} />
 
+        {/* the stick switch: this indicator lights while `pressed` */}
+        <circle cx={12} cy={12} r={3.5} fill={pressed ? '#ef4444' : BODY_DARK} stroke={LINE} strokeWidth={1} />
+        <Txt x={12} y={22} size={5} fill={DIM}>
+          SW
+        </Txt>
+
         {/* gimbal well */}
-        <circle cx={45} cy={36} r={26} fill={BODY_DARK} stroke={LINE} strokeWidth={1.4} />
+        <circle cx={45} cy={36} r={WELL_R} fill={BODY_DARK} stroke={LINE} strokeWidth={1.4} />
         <circle cx={45} cy={36} r={20} fill={BODY} stroke={LINE} strokeWidth={0.8} />
 
         {/* thumbstick dome, offset by the axis params for feedback */}
@@ -133,3 +179,60 @@ export const joystick: PartDef = {
     )
   },
 }
+
+// HC-SR04 ultrasonic rangefinder: the classic four-pin board with two 40 kHz transducers
+// (one transmits the burst, the other hears the echo). TRIG fires the burst; ECHO is held
+// HIGH for 58 us per cm of round-trip distance, which a sketch times with pulseIn. The
+// `distanceCm` param sets what the module "sees" and is editable in the Inspector.
+export const hcSr04: PartDef = {
+  id: 'hc-sr04',
+  name: 'Ultrasonic (HC-SR04)',
+  category: 'sensors',
+  width: 84,
+  height: 64,
+  pins: [
+    { id: 'vcc', label: 'VCC', x: 12, y: 64, kind: 'power' },
+    { id: 'trig', label: 'TRIG', x: 32, y: 64, kind: 'io' },
+    { id: 'echo', label: 'ECHO', x: 52, y: 64, kind: 'io' },
+    { id: 'gnd', label: 'GND', x: 72, y: 64, kind: 'ground' },
+  ],
+  defaultParams: { distanceCm: 30 },
+  device: hcSr04Device,
+  render: ({ def, part }) => {
+    const cm = part.params?.distanceCm ?? def.defaultParams?.distanceCm ?? 30
+    return (
+      <>
+        <rect x={1} y={1} width={82} height={50} rx={4} fill={BODY} stroke={LINE} strokeWidth={1.4} />
+
+        {/* the two transducer cans: T transmits the burst, R listens for the return echo */}
+        <circle cx={27} cy={23} r={16} fill={BODY_DARK} stroke={LINE} strokeWidth={1.4} />
+        <circle cx={27} cy={23} r={11} fill="none" stroke={LINE} strokeWidth={0.8} />
+        <Txt x={27} y={26} size={8} fill={ACCENT}>
+          T
+        </Txt>
+        <circle cx={61} cy={23} r={16} fill={BODY_DARK} stroke={LINE} strokeWidth={1.4} />
+        <circle cx={61} cy={23} r={11} fill="none" stroke={LINE} strokeWidth={0.8} />
+        <Txt x={61} y={26} size={8} fill={ACCENT}>
+          R
+        </Txt>
+
+        <Txt x={44} y={9} size={6} fill={DIM}>
+          HC-SR04
+        </Txt>
+        {/* what the module "sees", so the Inspector param reads on the canvas */}
+        <Txt x={44} y={45} size={6} fill={TEXT}>
+          {`${cm} cm`}
+        </Txt>
+
+        {/* 4-pin header: VCC / TRIG / ECHO / GND */}
+        <rect x={6} y={52} width={72} height={11} rx={2} fill={BODY_DARK} stroke={LINE} strokeWidth={1} />
+        <Txt x={44} y={60} size={5} fill={DIM}>
+          VCC TRIG ECHO GND
+        </Txt>
+
+        <Pads pins={def.pins} />
+      </>
+    )
+  },
+}
+

@@ -19,6 +19,26 @@ export interface PinDef {
   kind: PinKind
 }
 
+/** A pointer gesture resolved into a parameter change on a part. */
+export interface ControlChange {
+  /** Parameter name, e.g. 'pressed', 'position', 'x'. */
+  param: string
+  value: number
+}
+
+/** A mouse gesture on a part, already converted into the part's own frame. */
+export interface ControlGesture {
+  part: PartInstance
+  def: PartDef
+  /**
+   * The pointer in this part's LOCAL frame, with rotation undone. Expressed locally so a
+   * control keeps working when the part is rotated.
+   */
+  local: Vec
+  /** `down` decides operate-versus-move; `move` and `up` continue or finish the gesture. */
+  phase: 'down' | 'move' | 'up'
+}
+
 /** A registered component type. Pure data + a stateless visual. */
 export interface PartDef {
   /** Registry id, e.g. "arduino-uno". */
@@ -48,6 +68,14 @@ export interface PartDef {
   mcu?: McuSpec
   /** Present when the part is a digital peripheral (display, shift register, ...). */
   device?: DeviceModel
+  /**
+   * Map a mouse gesture to parameter changes - the knob of a potentiometer, the actuator
+   * of a button, the stick of a joystick. Returning `null` means this gesture is not on the
+   * part's control, and the canvas treats it as dragging the part itself. Only called for a
+   * `down` that already landed on the part. An array is for controls that move more than one
+   * parameter at once, such as a two-axis joystick.
+   */
+  control?: (gesture: ControlGesture) => ControlChange | ControlChange[] | null
   /** Draws the part in its local frame. Must not mutate anything. */
   render: (props: { part: PartInstance; def: PartDef; state?: PartRenderState }) => ReactNode
 }
@@ -120,6 +148,12 @@ export interface DeviceModel {
   ) => Record<string, 0 | 1 | 'z'>
   /** Derive render state from the device's own state, for the canvas. */
   visual?: (state: Record<string, unknown>) => PartRenderState
+  /**
+   * True when this device drives its outputs on a microsecond timescale, so it must be
+   * stepped *inside* the frame rather than once at its end. An ultrasonic sensor's echo is
+   * the case: stepped only at the frame boundary, its pulse is born and dies unseen.
+   */
+  timed?: boolean
   /** Present when the part sits on the I2C bus (a display, a sensor). */
   i2c?: I2cDevice
 }

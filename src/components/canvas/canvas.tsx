@@ -24,6 +24,7 @@ import {
   screenToWorld,
   snapVec,
 } from '@/lib/geometry'
+import { controlDown, controlDrag } from '@/lib/controls'
 import { allPartDefs } from '@/lib/parts'
 import type { Endpoint, Vec, Wire } from '@/lib/types'
 import { useDiagram } from '@/store/diagram'
@@ -38,6 +39,9 @@ type Drag =
   // `sent` is the last grid-aligned offset applied, so accumulation never stalls in the snap dead zone.
   | { kind: 'move'; startWorld: Vec; sent: Vec }
   | { kind: 'wire'; from: Endpoint }
+  // A gesture on a part's own control (knob, button, stick). One history snapshot for the
+  // whole drag, so operating a control is a single undo step.
+  | { kind: 'control'; partId: string }
 
 const isEditable = (t: EventTarget | null) =>
   t instanceof HTMLElement &&
@@ -59,6 +63,7 @@ export function Canvas() {
   const dragRef = useRef<Drag | null>(null)
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [hoverPin, setHoverPin] = useState<Endpoint | null>(null)
+  const [overControl, setOverControl] = useState(false)
   const [space, setSpace] = useState(false)
   const [panning, setPanning] = useState(false)
 
@@ -156,6 +161,18 @@ export function Canvas() {
       return
     }
 
+    const hit = controlDown(store.diagram, defs, world)
+    if (hit) {
+      store.setSelection([hit.part.id])
+      store.pushHistory()
+      // A control may drive several parameters at once (a joystick's two axes).
+      for (const change of hit.changes) store.setPartParam(hit.part.id, change.param, change.value)
+      dragRef.current = { kind: 'control', partId: hit.part.id }
+      setHoverPin(null)
+      el.setPointerCapture(e.pointerId)
+      return
+    }
+
     const part = hitTestPart(store.diagram, defs, world)
     if (part) {
       beginMove(part.id, world, e.shiftKey, e.pointerId)
@@ -185,6 +202,7 @@ export function Canvas() {
       setHoverPin((prev) =>
         prev?.part === next?.part && prev?.pin === next?.pin ? prev : next,
       )
+      setOverControl(next === null && controlDown(store.diagram, defs, worldOf(e)) !== null)
       return
     }
 
@@ -225,6 +243,17 @@ export function Canvas() {
       if (delta.x || delta.y) {
         store.moveSelection(delta)
         drag.sent = shift
+      }
+      return
+    }
+
+    if (drag.kind === 'control') {
+      const part = store.diagram.parts.find((p) => p.id === drag.partId)
+      const def = part && defs.get(part.def)
+      if (part && def) {
+        for (const change of controlDrag(part, def, worldOf(e), 'move') ?? []) {
+          store.setPartParam(part.id, change.param, change.value)
+        }
       }
       return
     }
@@ -276,6 +305,17 @@ export function Canvas() {
       const ontoSelf = target && target.part === drag.from.part && target.pin === drag.from.pin
       if (target && !ontoSelf) store.addWire(drag.from, target)
       else store.cancelWire()
+      return
+    }
+
+    if (drag.kind === 'control') {
+      const part = store.diagram.parts.find((p) => p.id === drag.partId)
+      const def = part && defs.get(part.def)
+      if (part && def) {
+        for (const change of controlDrag(part, def, worldOf(e), 'up') ?? []) {
+          store.setPartParam(part.id, change.param, change.value)
+        }
+      }
     }
   }
 
@@ -323,7 +363,15 @@ export function Canvas() {
   }
 
   const previewFrom = wiring ? pinAnchor(wiring.from.part, wiring.from.pin) : null
-  const cursor = panning ? 'grabbing' : space ? 'grab' : wiring || hoverPin ? 'crosshair' : 'default'
+  const cursor = panning
+    ? 'grabbing'
+    : space
+      ? 'grab'
+      : wiring || hoverPin
+        ? 'crosshair'
+        : overControl
+          ? 'pointer'
+          : 'default'
 
   return (
     <div
@@ -338,7 +386,10 @@ export function Canvas() {
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       onPointerLeave={() => {
-        if (!dragRef.current) setHoverPin(null)
+        if (!dragRef.current) {
+          setHoverPin(null)
+          setOverControl(false)
+        }
       }}
       onKeyDown={onKeyDown}
       onKeyUp={(e) => {
