@@ -50,6 +50,15 @@ Three things to know before deploying this anywhere public:
 `compileSketch()` runs in a Web Worker so the canvas never stutters; `compileSketchInline()`
 runs on the current thread and is what the headless tests use.
 
+### Why the Pico is not simulated
+
+The roadmap's P5 is **blocked, not skipped**: a Raspberry Pi Pico needs ARM firmware, and
+there is no arm-gcc toolchain built for WebAssembly, no `picotool`, and the bundled toolchain
+only carries AVR object groups (`base`, `oled`, `tof`). Since a Pico can only run a `.uf2`
+that something else produced, adding `rp2040js` would give you a board you can *watch* but
+never *program* — a picture, not a playground. It becomes worth building the moment either
+(a) an in-browser arm-gcc exists, or (b) a backend compile for non-AVR boards is accepted.
+
 ## Examples
 
 `examples/led-bar.json` — an **8-LED bar graph driven by a 74HC595**. Import it with the
@@ -147,7 +156,7 @@ exactly that, because it is easy to mistake for a code error.
 | P4d   | PWM averaging and a live pin voltmeter | done   |
 | P4e   | I²C/SPI displays (OLED, LCD)            | done (OLED) |
 | P4f   | Servo and a 4x4 keypad (library depth)  | done   |
-| P5    | Pico simulation                         | –      |
+| P5    | Pico simulation                         | blocked — no ARM toolchain |
 
 ## Conventional Commits
 
