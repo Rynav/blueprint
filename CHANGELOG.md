@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.12.0] - 2026-10-18
+
+### Documentation
+- license the project under MIT
+- keep LICENSE byte-exact and move third-party terms to a notice
+
+
+### Features
+- (**editor**) Arduino completions and hover documentation
+- (**editor**) Monaco with the blueprint theme, code-split behind a fallback
+- shortcut: the emitted language workers are dead weight in dist; dispatch on the requested label in getWorker if a non-cpp model is ever added.
+
+
+### Maintenance
+- ignore env files
+- (**deps**) move build-only packages out of dependencies
+
 ## [0.11.0] - 2026-10-18
 
 ### Bug Fixes

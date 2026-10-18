@@ -25,6 +25,21 @@ is the lockfile and must be committed. Use `bun` / `bunx` for everything.
 Other scripts: `bun run preview` (serve the production build), `bun run changelog:preview`
 (print unreleased entries without writing the file).
 
+## Editor
+
+The sketch panel is Monaco: C++ syntax highlighting in the blueprint theme, plus **Arduino
+intelligence** — completions and hover docs for the platform API and its constants
+(`pinMode`, `analogRead`, `Serial.*`, `Wire.*`, `Servo.*`, the Adafruit display methods,
+`HIGH`, `INPUT_PULLUP`, `SSD1306_WHITE`, …). Typing `Serial.` offers that object's methods.
+
+It is **code-split** and wrapped in an error boundary with a plain textarea fallback: losing
+syntax highlighting is cosmetic, losing the ability to write code is not.
+
+The intelligence is a curated table in `src/lib/editor/arduino-api.ts`, not a language server
+— a real C++ LSP needs clangd wasm-compiled alongside the compiler. Being pure data and pure
+functions, it is unit-tested, including a check that every API name the shipped examples use
+is actually documented.
+
 ## Compile toolchain (P3)
 
 Arduino C++ is compiled **entirely in the browser** — there is no build server. Sketches are
@@ -157,6 +172,7 @@ exactly that, because it is easy to mistake for a code error.
 | P4e   | I²C/SPI displays (OLED, LCD)            | done (OLED) |
 | P4f   | Servo and a 4x4 keypad (library depth)  | done   |
 | P4g   | Parallel LCD, stepper and joystick      | done   |
+| P4h   | Monaco: syntax highlighting and Arduino completions | done   |
 | P5    | Pico simulation                         | blocked — no ARM toolchain |
 
 ## License
