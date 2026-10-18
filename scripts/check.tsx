@@ -39,8 +39,11 @@ function onPolyline(pts: Vec[], p: Vec): boolean {
 
 // ---- registry invariants ----
 const defs = allPartDefs()
-ok('registry is populated', defs.length === 15)
+ok('registry is populated', defs.length >= 15)
 ok('getPartDef resolves uno', getPartDef('arduino-uno')?.pins.length === 26)
+ok('the analog devices are registered', getPartDef('npn-transistor')?.pins.length === 3)
+ok('the mosfets are registered', getPartDef('nmos')?.pins.length === 3)
+ok('the diode is registered', getPartDef('diode')?.pins.length === 2)
 ok('getPartDef miss is undefined', getPartDef('nope') === undefined)
 ok('every category is non-empty', PART_CATEGORIES.every((c) => listParts(c.id).length > 0))
 ok(
