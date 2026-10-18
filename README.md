@@ -146,6 +146,7 @@ exactly that, because it is easy to mistake for a code error.
 | P4c   | Input devices (buttons, keypads, analog sensors) | done   |
 | P4d   | PWM averaging and a live pin voltmeter | done   |
 | P4e   | I²C/SPI displays (OLED, LCD)            | done (OLED) |
+| P4f   | Servo and a 4x4 keypad (library depth)  | done   |
 | P5    | Pico simulation                         | –      |
 
 ## Conventional Commits

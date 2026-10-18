@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.10.0] - 2026-10-18
+
+### Features
+- (**parts**) servo and 4x4 keypad
+- shortcut: one pulse per frame is assumed, so a servo driven above ~60 Hz would need edge timing rather than duty. A keypad models a single key, with no contact resistance and no three-key ghosting. Matrix scanning needs each row held for several frames, so it works at human keypress timescales, not at kHz.
+
 ## [0.9.0] - 2026-10-18
 
 ### Documentation
