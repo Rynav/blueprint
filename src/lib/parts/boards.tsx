@@ -1,4 +1,4 @@
-import type { PinDef, PinKind, PartDef } from '@/lib/types'
+import type { McuSpec, PinDef, PinKind, PartDef } from '@/lib/types'
 import { ACCENT, BODY, BODY_DARK, LINE, Pads, Txt } from './shared'
 
 /** [id, label, kind] shorthand for a pin row. */
@@ -73,6 +73,34 @@ const unoLower: Row[] = [
 
 const unoPins: PinDef[] = [...unoDigital, ...edgeH(unoLower, UNO_W, UNO_H, 30)]
 
+/** ATmega328P breakout pinout: d0-d7 = PD0-PD7, d8-d13 = PB0-PB5, a0-a5 = PC0-PC5. */
+const mcu328: McuSpec = {
+  chip: 'atmega328p',
+  clockHz: 16_000_000,
+  pins: {
+    d0: { port: 'D', bit: 0 },
+    d1: { port: 'D', bit: 1 },
+    d2: { port: 'D', bit: 2 },
+    d3: { port: 'D', bit: 3 },
+    d4: { port: 'D', bit: 4 },
+    d5: { port: 'D', bit: 5 },
+    d6: { port: 'D', bit: 6 },
+    d7: { port: 'D', bit: 7 },
+    d8: { port: 'B', bit: 0 },
+    d9: { port: 'B', bit: 1 },
+    d10: { port: 'B', bit: 2 },
+    d11: { port: 'B', bit: 3 },
+    d12: { port: 'B', bit: 4 },
+    d13: { port: 'B', bit: 5 },
+    a0: { port: 'C', bit: 0 },
+    a1: { port: 'C', bit: 1 },
+    a2: { port: 'C', bit: 2 },
+    a3: { port: 'C', bit: 3 },
+    a4: { port: 'C', bit: 4 },
+    a5: { port: 'C', bit: 5 },
+  },
+}
+
 const arduinoUno: PartDef = {
   id: 'arduino-uno',
   name: 'Arduino Uno',
@@ -80,6 +108,7 @@ const arduinoUno: PartDef = {
   width: UNO_W,
   height: UNO_H,
   pins: unoPins,
+  mcu: mcu328,
   render: () => (
     <>
       <rect x={0} y={0} width={UNO_W} height={UNO_H} rx={6} fill={BODY} stroke={LINE} strokeWidth={1.5} />
@@ -169,6 +198,8 @@ const arduinoNano: PartDef = {
   width: NANO_W,
   height: NANO_H,
   pins: nanoPins,
+  // Same ATmega328P breakout; a6/a7 are analog-only inputs, so they carry no port bit.
+  mcu: mcu328,
   render: () => (
     <>
       <rect x={0} y={0} width={NANO_W} height={NANO_H} rx={5} fill={BODY} stroke={LINE} strokeWidth={1.5} />
