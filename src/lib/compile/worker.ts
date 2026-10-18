@@ -9,6 +9,8 @@ export interface BuildRequest {
   source: string
   /** Where tools/ and assets/ are served from (e.g. "/avr/"). Defaults to the package. */
   assetsBase?: string
+  /** Toolchain link groups to include, e.g. ['OLED']. */
+  sensors?: string[]
 }
 
 export type BuildResponse =
@@ -16,9 +18,9 @@ export type BuildResponse =
   | { id: number; error: string }
 
 addEventListener('message', async (event) => {
-  const { id, source, assetsBase } = event.data as BuildRequest
+  const { id, source, assetsBase, sensors } = event.data as BuildRequest
   try {
-    const { hex, fitsTarget } = await buildFirmware({ source, assetsBase })
+    const { hex, fitsTarget } = await buildFirmware({ source, assetsBase, sensors })
     postMessage({ id, hex, fitsTarget } satisfies BuildResponse)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

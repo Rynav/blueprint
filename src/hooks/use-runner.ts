@@ -4,6 +4,7 @@ import { createAvrRuntime } from '@/lib/avr/runtime'
 import { simulate } from '@/lib/circuit'
 import { compileSketch } from '@/lib/compile'
 import { createDeviceHarness } from '@/lib/devices'
+import { createI2cBus } from '@/lib/devices/i2c'
 import { feedbackFromCircuit } from '@/lib/inputs'
 import { allPartDefs, getPartDef } from '@/lib/parts'
 import type { PartRenderState } from '@/lib/types'
@@ -40,14 +41,20 @@ export function useRunner() {
     sim.setStatus('compiling')
 
     try {
-      const { hex, fitsTarget } = await compileSketch(sim.source, '/avr/')
+      const defs = new Map(allPartDefs().map((d) => [d.id, d]))
+      const diagram = useDiagram.getState().diagram
+      // The toolchain only links libraries whose group is requested, and a part declares what it
+      // needs, so union the groups across the diagram (a display pulls in the OLED object set).
+      const sensors = [...new Set(diagram.parts.flatMap((p) => defs.get(p.def)?.sensors ?? []))]
+
+      const { hex, fitsTarget } = await compileSketch(sim.source, '/avr/', sensors)
       if (!fitsTarget) {
         sim.setStatus('error')
         sim.setMessage("Sketch does not fit the board's flash.")
         return
       }
 
-      const board = useDiagram.getState().diagram.parts.find((p) => getPartDef(p.def)?.mcu)
+      const board = diagram.parts.find((p) => getPartDef(p.def)?.mcu)
       const def = board && getPartDef(board.def)
       if (!board || !def) {
         sim.setStatus('error')
@@ -55,10 +62,12 @@ export function useRunner() {
         return
       }
 
-      const runtime = createAvrRuntime(board, def)
-      runtime.load(hex)
-      const defs = new Map(allPartDefs().map((d) => [d.id, d]))
       deviceState.current = new Map()
+      // The I2C bus routes controller traffic to the placed devices' own models. Built once
+      // per run: adding a display mid-run needs a re-run, which the sketch needs anyway.
+      const i2c = createI2cBus(diagram, defs, deviceState.current)
+      const runtime = createAvrRuntime(board, def, { i2c })
+      runtime.load(hex)
       sim.setStatus('running')
 
       const frame = () => {

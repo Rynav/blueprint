@@ -18,9 +18,18 @@ export interface CompileResult {
  *
  * @param assetsBase where the toolchain's tools/ and assets/ are served from;
  *   omit to use the package's own files (correct under bun, not in a browser).
+ * @param sensors toolchain link groups to include, e.g. `['OLED']`. Omit for the base set.
  */
-export async function compileSketchInline(source: string, assetsBase?: string | URL): Promise<CompileResult> {
-  const { hex, fitsTarget } = await buildFirmware({ source: preprocessSketch(source), assetsBase })
+export async function compileSketchInline(
+  source: string,
+  assetsBase?: string | URL,
+  sensors?: string[],
+): Promise<CompileResult> {
+  const { hex, fitsTarget } = await buildFirmware({
+    source: preprocessSketch(source),
+    assetsBase,
+    sensors,
+  })
   return { hex, fitsTarget }
 }
 
@@ -38,7 +47,7 @@ let nextBuildId = 1
  * message/error only, so a wedged asset fetch would hang it. Add an AbortSignal
  * timeout when builds become user-cancellable.
  */
-export function compileSketch(source: string, assetsBase?: string | URL): Promise<CompileResult> {
+export function compileSketch(source: string, assetsBase?: string | URL, sensors?: string[]): Promise<CompileResult> {
   const id = nextBuildId++
   const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
@@ -57,7 +66,7 @@ export function compileSketch(source: string, assetsBase?: string | URL): Promis
     })
 
     // A URL instance is not reliably structured-cloneable across browsers, so send a string.
-    const request: BuildRequest = { id, source: preprocessSketch(source), assetsBase: assetsBase == null ? undefined : String(assetsBase) }
+    const request: BuildRequest = { id, source: preprocessSketch(source), assetsBase: assetsBase == null ? undefined : String(assetsBase), sensors }
     worker.postMessage(request)
   })
 }
