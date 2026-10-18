@@ -92,11 +92,9 @@ export const uln2003: PartDef = {
 
 // Analog joystick (KY-023 class): two potentiometers on X/Y plus a push switch, brought out
 // to a 5-pin header. The dome is nudged by x/y so the stick's position reads on the canvas.
-// Operated by dragging the stick inside the gimbal well; a control change carries one
-// parameter, so each gesture drives the axis it leans on most (x: left 0 -> right 1, y: up
-// 0 -> down 1, the sense circuit.ts solves), and a release re-centres the off-centre axis.
-// shortcut: one axis per gesture; a truly 2-D stick needs ControlChange to carry both, which
-// the frozen type does not allow. Upgrade when the gesture contract gains a second value.
+// Operated by dragging the stick inside the gimbal well. One gesture carries both axes (x:
+// left 0 -> right 1, y: up 0 -> down 1, the sense circuit.ts solves), so a diagonal drag is
+// one movement rather than two, and a release re-centres whichever axis is off centre.
 const STICK = { x: 45, y: 36 }
 const WELL_R = 26
 const STICK_DEAD = 4
