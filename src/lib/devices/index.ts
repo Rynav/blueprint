@@ -41,6 +41,11 @@ export interface DeviceHarness {
   seed(mcuPinValues: Map<string, PinValue>): void
   /** Apply one pin transition, stepping only the devices that read that pin's net. */
   applyTransition(key: string, value: PinValue, dtMicros?: number): void
+  /**
+   * Advance only the `timed` devices by one slice, for use inside a sliced `runFor`. The
+   * frame-end `settle` skips timed devices, since they have already consumed the frame.
+   */
+  tickTimed(mcuPinValues: Map<string, PinValue>, dtMicros: number): Map<string, PinValue>
   /** Step every device once with the final pin levels and return the merged pin map. */
   settle(mcuPinValues: Map<string, PinValue>, dtMicros?: number): Map<string, PinValue>
 }
@@ -135,10 +140,14 @@ export function createDeviceHarness(
     }
   }
 
+  const isTimed = (part: PartInstance) => defs.get(part.def)?.device?.timed === true
+
   const stepDevice = (part: PartInstance, dtMicros: number, merged: Map<string, PinValue>) => {
     const def = defs.get(part.def)
     if (!def?.device) return
-    const bag = state.get(part.id) ?? {}
+    // A new bag starts from the part's own params, so an Inspector value (a distance, an
+    // angle) reaches the model without the model having to know about PartInstance.
+    const bag = state.get(part.id) ?? { ...part.params }
     state.set(part.id, bag)
 
     let driven: Record<string, 0 | 1 | 'z'>
@@ -193,7 +202,21 @@ export function createDeviceHarness(
     settle(mcuPinValues, dtMicros = 0) {
       seedNetLevel(mcuPinValues)
       const merged = new Map(mcuPinValues)
-      for (const part of devices) stepDevice(part, dtMicros, merged)
+      // Timed devices consumed the frame's time slice by slice, so they are not stepped here.
+      for (const part of devices) if (!isTimed(part)) stepDevice(part, dtMicros, merged)
+      return merged
+    },
+
+    /**
+     * Advance only the `timed` devices by one slice. They drive outputs on a microsecond
+     * timescale, so they have to be stepped within the frame - but stepping *every* device
+     * per slice would hand the rest a per-slice dt, which silently breaks models that pair a
+     * frame-level measurement with it (the servo, whose duty is measured over the frame).
+     */
+    tickTimed(mcuPinValues, dtMicros) {
+      seedNetLevel(mcuPinValues)
+      const merged = new Map(mcuPinValues)
+      for (const part of devices) if (isTimed(part)) stepDevice(part, dtMicros, merged)
       return merged
     },
   }

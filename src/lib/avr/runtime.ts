@@ -34,8 +34,12 @@ export interface PinTransition {
 export interface AvrRuntime {
   /** Load Intel HEX (or the raw words). Safe to call repeatedly. */
   load(hex: string): void
-  /** Advance simulated time, dispatching interrupts. */
-  runFor(micros: number): void
+  /**
+   * Advance simulated time, dispatching interrupts. With `onSlice`, advance in short slices
+   * and call it after each one, so a caller can step a device whose output the sketch polls
+   * (a rangefinder echo) inside the same frame. Without it, one contiguous run.
+   */
+  runFor(micros: number, onSlice?: () => void): void
   /** Pin values keyed `${partId}:${pinId}`, only for pins in the board's `mcu.pins`. */
   pinValues(): Map<string, PinValue>
   /**
@@ -70,6 +74,19 @@ export interface AvrRuntime {
 const FLASH_BYTES = 0x8000
 /** Per-call ceiling on simulated time, so one frame cannot stall the tab for seconds. */
 const MAX_RUN_MICROS = 60_000_000
+/**
+ * CPU cycles between `onSlice` callbacks in a sliced `runFor`: 32 cycles is ~2 us at 16 MHz.
+ * A sketch polling a device-driven pin therefore sees each edge within ~2 us, and a measured
+ * pulse width is accurate to about +-2 us. Smaller finds narrower pulses; larger is cheaper
+ * (one callback per slice is the whole cost, see `runFor`).
+ */
+/**
+ * CPU cycles per slice when `runFor` is given a callback: 128 cycles, 8 us at 16 MHz.
+ * A measured pulse is accurate to about +-8 us, which is 0.14 cm on an HC-SR04, while a
+ * 10 us TRIG pulse still spans more than one slice. Halving the slice count halves the
+ * per-frame cost, so this is deliberately the coarse end of usable.
+ */
+const SLICE_CYCLES = 128
 /** Most pin transitions kept for replay after a single run; oldest are dropped past this. */
 const MAX_TRANSITIONS = 4096
 
@@ -336,16 +353,32 @@ export function createAvrRuntime(
       resetDutyWindow()
     },
 
-    runFor(micros) {
+    runFor(micros, onSlice) {
       if (!Number.isFinite(micros) || micros <= 0) return
       const span = Math.min(micros, MAX_RUN_MICROS)
       // One `avrInstruction` + `tick` per loop turn. At 16 MHz that is ~16 000 turns per
       // simulated millisecond, so a 60 fps frame (~16.7 ms) costs ~267 000 turns - this
       // loop is essentially the entire cost of the runtime.
       const deadline = machine.cpu.cycles + Math.round((span / 1e6) * clockHz)
+      if (!onSlice) {
+        // Byte-identical to the pre-slicing path: one contiguous run, no extra overhead.
+        while (machine.cpu.cycles < deadline) {
+          avrInstruction(machine.cpu)
+          machine.cpu.tick() // dispatches interrupts; without it timer0 never fires and delay() is wrong
+        }
+        return
+      }
+      // Sliced run. Between slices the caller can step a device and push its output straight
+      // onto the MCU's pins, so a signal the sketch polls is seen within a slice instead of a
+      // whole frame. Cost is one `onSlice` per ~2 us (a 16 ms frame is ~8000 of them); the
+      // cap and the tick discipline above still apply.
       while (machine.cpu.cycles < deadline) {
-        avrInstruction(machine.cpu)
-        machine.cpu.tick() // dispatches interrupts; without it timer0 never fires and delay() is wrong
+        const sliceEnd = Math.min(deadline, machine.cpu.cycles + SLICE_CYCLES)
+        while (machine.cpu.cycles < sliceEnd) {
+          avrInstruction(machine.cpu)
+          machine.cpu.tick()
+        }
+        onSlice()
       }
     },
 

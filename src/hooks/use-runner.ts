@@ -6,6 +6,7 @@ import { compileSketch } from '@/lib/compile'
 import { createDeviceHarness } from '@/lib/devices'
 import { createI2cBus } from '@/lib/devices/i2c'
 import { feedbackFromCircuit } from '@/lib/inputs'
+import { buildNets } from '@/lib/netlist'
 import { allPartDefs, getPartDef } from '@/lib/parts'
 import type { PartRenderState } from '@/lib/types'
 import { useDiagram } from '@/store/diagram'
@@ -75,19 +76,66 @@ export function useRunner() {
         // Seeding with the end-of-frame values instead breaks any device that latches several
         // pins at once (a parallel LCD reading RS and data on an Enable edge).
         const startPins = runtime.pinValues()
-
-        runtime.runFor(FRAME_MICROS)
         const diagram = useDiagram.getState().diagram
+
+        // Netlist for this frame: used to route a device's output straight onto the MCU pins
+        // that share its net, which is the fast path below.
+        const nets = buildNets(diagram, defs)
+        const boardPinsByNet = new Map<string, string[]>()
+        for (const pin of def.pins) {
+          const net = nets.netOf(board.id, pin.id)
+          if (net === undefined) continue
+          const list = boardPinsByNet.get(net)
+          if (list) list.push(pin.id)
+          else boardPinsByNet.set(net, [pin.id])
+        }
+        // Device outputs that land on a net the board can read, resolved once per frame so the
+        // per-slice path is a couple of map lookups rather than a netlist walk.
+        const outputsToBoard: { key: string; mcuPins: string[] }[] = []
+        for (const part of diagram.parts) {
+          const device = defs.get(part.def)?.device
+          if (!device) continue
+          for (const output of device.outputs) {
+            const net = nets.netOf(part.id, output)
+            const mcuPins = net === undefined ? undefined : boardPinsByNet.get(net)
+            if (mcuPins?.length) outputsToBoard.push({ key: `${part.id}:${output}`, mcuPins })
+          }
+        }
+
+        const harness = createDeviceHarness(diagram, defs, deviceState.current)
+
+        // A `timed` device drives outputs on a microsecond timescale, so it has to be stepped
+        // *inside* the frame - stepped only at its end, its pulse is born and dies unseen and
+        // `pulseIn` reads a timeout. Everything else stays once-per-frame, because stepping a
+        // frame-level model with a per-slice dt silently breaks it (the servo pairs a duty
+        // measured over the whole frame with dt). Circuits with no timed device pay nothing.
+        const timed = diagram.parts.some((p) => defs.get(p.def)?.device?.timed)
+        if (timed) {
+          harness.seed(startPins)
+          let last = runtime.elapsedMicros()
+          runtime.runFor(FRAME_MICROS, () => {
+            const now = runtime.elapsedMicros()
+            const dt = now - last
+            last = now
+            const merged = harness.tickTimed(runtime.pinValues(), dt)
+            for (const { key, mcuPins } of outputsToBoard) {
+              const level = merged.get(key)
+              if (level !== 0 && level !== 1) continue
+              for (const pinId of mcuPins) runtime.setInputPin(pinId, level)
+            }
+          })
+        } else {
+          runtime.runFor(FRAME_MICROS)
+        }
 
         // Fraction of the frame each pin spent high. This is what lets a PWM pin dim an LED or
         // drive a motor proportionally, and what a servo will measure pulse width from.
+        // Measured over the whole frame, so nothing may drain the transition window early.
         const duty = runtime.pinDuty()
 
         // Devices read the MCU's pin levels and drive their own outputs into the same solve.
         // A bit-banged clock pulse is far narrower than a frame, so replay every pin edge the
-        // CPU produced this frame, in order, before sampling the final levels. One harness per
-        // frame: the wiring can change while the sketch runs.
-        const harness = createDeviceHarness(diagram, defs, deviceState.current, duty)
+        // CPU produced this frame, in order, before sampling the final levels.
         harness.seed(startPins)
         for (const { key, value } of runtime.drainTransitions()) {
           if (harness.watched.has(key)) harness.applyTransition(key, value)
