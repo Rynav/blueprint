@@ -159,6 +159,15 @@ exactly that, because it is easy to mistake for a code error.
 | P4g   | Parallel LCD, stepper and joystick      | done   |
 | P5    | Pico simulation                         | blocked — no ARM toolchain |
 
+## License
+
+[MIT](LICENSE) — the app's own source, and nothing else.
+
+The compile toolchain is **not** covered by it. `@horang-corp/avr-gcc-wasm` packages GCC and
+GNU binutils built for WebAssembly, and those are **GPLv3 or later**. They are not part of
+this repository, but deploying the app serves them to visitors, which carries the GPL's
+corresponding-source obligation — see [Compile toolchain](#compile-toolchain-p3).
+
 ## Conventional Commits
 
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org)
