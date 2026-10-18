@@ -214,6 +214,19 @@ ok(
 )
 ok('an unwired pin still forms a net', nets.netOf(r1, '2') !== undefined)
 
+// ---- part visuals react to live simulation state ----
+const ledRender = getPartDef('led')!
+const ledPreview = { id: 'preview', def: 'led', at: { x: 0, y: 0 }, rotation: 0 as const }
+const ledMarkup = (brightness?: number) =>
+  renderToStaticMarkup(
+    createElement('svg', null, ledRender.render({ part: ledPreview, def: ledRender, state: { brightness } })),
+  )
+const ledOff = ledMarkup(0)
+ok('dark LED renders no lit fill', !ledOff.includes('#f87171'))
+ok('lit LED renders a lit fill', ledMarkup(1).includes('#f87171'))
+ok('LED visual differs between off and full brightness', ledMarkup(1) !== ledOff)
+ok('brightness 0 matches the unlit look', ledMarkup(0) === ledMarkup(undefined))
+
 // ---- whole-app render (palette + inspector + canvas mount, all part previews) ----
 // Note: zustand reports its *initial* state during SSR, so a server render shows an
 // empty canvas by design. Wire geometry is covered by the routing checks above.
