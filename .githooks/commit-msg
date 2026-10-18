@@ -1,0 +1,30 @@
+#!/bin/sh
+# Enforce Conventional Commits on the subject line.
+# https://www.conventionalcommits.org/en/v1.0.0/
+#
+# Installed via `git config core.hooksPath .githooks` (see package.json "prepare").
+
+msg_file="$1"
+subject=$(head -n1 "$msg_file")
+
+# git-generated and rebase-generated messages are exempt.
+case "$subject" in
+  "Merge "* | 'Revert '* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
+esac
+
+# empty subject (aborted commit) is not our problem
+[ -z "$subject" ] && exit 0
+
+pattern='^(feat|fix|perf|refactor|test|docs|build|ci|chore|style|revert)(\([a-z0-9 ._/-]+\))?!?: .+'
+
+if ! printf '%s' "$subject" | grep -qE "$pattern"; then
+  {
+    printf '\n✖ not a Conventional Commit:\n\n'
+    printf '    %s\n\n' "$subject"
+    printf 'expected: <type>(<scope>): <subject>\n'
+    printf 'types:    feat fix perf refactor test docs build ci chore style revert\n'
+    printf 'example:  feat(canvas): infinite grid with pan and zoom\n\n'
+    printf 'https://www.conventionalcommits.org/en/v1.0.0/\n\n'
+  } >&2
+  exit 1
+fi

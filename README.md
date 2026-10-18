@@ -43,3 +43,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 `CHANGELOG.md` is **generated from these commits by git-cliff** (config in `cliff.toml`) —
 do not hand-edit it. Run `bun run changelog` to regenerate.
+
+The format is enforced by a `commit-msg` hook in `.githooks/`, wired up by the `prepare`
+script on install. Non-conventional subjects are rejected, and `filter_unconventional = true`
+means an unchecked one would silently vanish from the changelog — the hook prevents that.

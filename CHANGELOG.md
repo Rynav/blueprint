@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [Unreleased]
+
+### Maintenance
+- enforce conventional commits with a commit-msg hook
+- shortcut: hook only checks the subject line, not body/footer format; tighten if footers start drifting
+
 ## [0.1.0] - 2026-10-18
 
 ### Features
