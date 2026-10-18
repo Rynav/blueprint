@@ -5,6 +5,7 @@ import App from '@/App'
 import { polylineMidpoint, toPath, WIRE_STUB, wirePoints } from '@/components/canvas/render'
 import { pinDir, pinWorld } from '@/lib/geometry'
 import { allPartDefs, getPartDef, listParts, PART_CATEGORIES } from '@/lib/parts'
+import { buildNets } from '@/lib/netlist'
 import { parse, serialize } from '@/lib/persist'
 import type { Vec } from '@/lib/types'
 import { useDiagram } from '@/store/diagram'
@@ -180,6 +181,38 @@ ok('rotating 180 degrees is a point reflection about the centre', (() => {
   const p180 = pinWorld({ ...lPart, rotation: 180 as const }, ledDef2, 'a')!
   return p180.x === lPart.at.x + 10 && p180.y === lPart.at.y
 })())
+
+// ---- netlist: wiring a breadboard row must actually short it ----
+const defsMap = new Map(allPartDefs().map((d) => [d.id, d]))
+useDiagram.getState().clear()
+const bb = useDiagram.getState().addPart('breadboard-half', { x: 0, y: 0 })
+const r1 = useDiagram.getState().addPart('resistor', { x: -260, y: 0 })
+const r2 = useDiagram.getState().addPart('resistor', { x: -260, y: 100 })
+useDiagram.getState().addWire({ part: r1, pin: '1' }, { part: bb, pin: 'a1' })
+useDiagram.getState().addWire({ part: r2, pin: '1' }, { part: bb, pin: 'c1' })
+
+const nets = buildNets(useDiagram.getState().diagram, defsMap)
+ok('breadboard: one column half is a single net', nets.netOf(bb, 'a1') === nets.netOf(bb, 'c1'))
+ok('breadboard: halves of a column stay separate', nets.netOf(bb, 'a1') !== nets.netOf(bb, 'f1'))
+ok('breadboard: adjacent columns stay separate', nets.netOf(bb, 'a1') !== nets.netOf(bb, 'a2'))
+ok('two parts wired into one breadboard row share a net', nets.netOf(r1, '1') === nets.netOf(r2, '1'))
+ok('the untouched resistor pin is still its own net', nets.netOf(r1, '2') !== nets.netOf(r2, '1'))
+ok(
+  'net ids and pin order are deterministic',
+  JSON.stringify(buildNets(useDiagram.getState().diagram, defsMap).nets) === JSON.stringify(nets.nets),
+)
+
+const bbDef = getPartDef('breadboard-half')!
+ok(
+  'breadboard declares 60 column-half groups of 5 holes',
+  (bbDef.internalNets ?? []).length === 60 &&
+    (bbDef.internalNets ?? []).every((g) => g.length === 5),
+)
+ok(
+  'pushbutton poles are tied internally',
+  JSON.stringify(getPartDef('pushbutton')!.internalNets) === JSON.stringify([['1a', '1b'], ['2a', '2b']]),
+)
+ok('an unwired pin still forms a net', nets.netOf(r1, '2') !== undefined)
 
 // ---- whole-app render (palette + inspector + canvas mount, all part previews) ----
 // Note: zustand reports its *initial* state during SSR, so a server render shows an
