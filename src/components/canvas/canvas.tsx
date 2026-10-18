@@ -50,7 +50,7 @@ export function Canvas() {
   const wiring = useDiagram((s) => s.wiring)
   // Brightness changes every frame while running, so this re-renders the whole scene.
   // shortcut: no culling or memoisation yet; add per-part memo if a full breadboard gets janky.
-  const brightness = useSimulation((s) => s.brightness)
+  const brightness = useSimulation((s) => s.partState)
 
   const defs = useMemo(() => new Map(allPartDefs().map((d) => [d.id, d])), [])
   const selected = useMemo(() => new Set(selection), [selection])
@@ -427,7 +427,7 @@ export function Canvas() {
                 part={part}
                 def={def}
                 hoveredPin={hoverPin?.part === part.id ? hoverPin.pin : null}
-                state={{ brightness: brightness[part.id] }}
+                state={brightness[part.id]}
               />
             ) : (
               <PlaceholderPart key={part.id} part={part} />

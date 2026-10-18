@@ -24,6 +24,11 @@ export interface AvrRuntime {
   runFor(micros: number): void
   /** Pin values keyed `${partId}:${pinId}`, only for pins in the board's `mcu.pins`. */
   pinValues(): Map<string, PinValue>
+  /**
+   * Every board-pin transition recorded since the last drain, in the order it happened:
+   * `{ key, value }` per changed bit, `'z'` when a pin goes back to input. Returns and clears.
+   */
+  drainTransitions(): Array<{ key: string; value: PinValue }>
   /** Everything written to the USART so far, decoded as text. */
   serial(): string
   /** Clear the serial buffer. */
@@ -37,6 +42,8 @@ export interface AvrRuntime {
 const FLASH_BYTES = 0x8000
 /** Per-call ceiling on simulated time, so one frame cannot stall the tab for seconds. */
 const MAX_RUN_MICROS = 60_000_000
+/** Most pin transitions kept for replay after a single run; oldest are dropped past this. */
+const MAX_TRANSITIONS = 4096
 
 type PortName = 'B' | 'C' | 'D'
 
@@ -94,6 +101,41 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
     port: p.port,
     bit: p.bit,
   }))
+  // Port bit -> board pin key, so a port write can be turned into per-bit transitions.
+  const portBits: Record<PortName, Map<number, string>> = { B: new Map(), C: new Map(), D: new Map() }
+  for (const pin of pins) portBits[pin.port].set(pin.bit, pin.key)
+
+  /**
+   * Board-pin transitions since the last drain. A bit-banged clock pulse can be a few CPU
+   * cycles wide, far narrower than a frame, so the caller replays these instead of sampling.
+   */
+  const transitions: Array<{ key: string; value: PinValue }> = []
+  const record = (key: string, value: PinValue) => {
+    transitions.push({ key, value })
+    // shortcut: buffer is capped (drops the oldest half when full), so a sketch that toggles a
+    // pin more than ~4k times within one frame loses its earliest edges. Upgrade to a true
+    // ring buffer if a design ever needs every edge of a pathological bit-bang.
+    if (transitions.length >= MAX_TRANSITIONS) transitions.splice(0, MAX_TRANSITIONS >> 1)
+  }
+  const attachListeners = (m: Machine) => {
+    for (const name of ['B', 'C', 'D'] as const) {
+      const bitKeys = portBits[name]
+      if (bitKeys.size === 0) continue
+      const port = m.ports[name]
+      const last = new Map<number, PinValue>()
+      for (const bit of bitKeys.keys()) last.set(bit, 'z') // fresh ports are all inputs
+      port.addListener(() => {
+        for (const [bit, key] of bitKeys) {
+          const state = port.pinState(bit)
+          const value: PinValue = state === PinState.High ? 1 : state === PinState.Low ? 0 : 'z'
+          if (last.get(bit) !== value) {
+            last.set(bit, value)
+            record(key, value)
+          }
+        }
+      })
+    }
+  }
 
   let prog: Uint16Array = new Uint16Array(FLASH_BYTES / 2).fill(0xffff)
   let serial = ''
@@ -101,12 +143,15 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
     serial += String.fromCharCode(value)
   }
   let machine = buildMachine(prog, clockHz, onByte)
+  attachListeners(machine)
 
   return {
     load(hex) {
       prog = parseIntelHex(hex)
       serial = ''
+      transitions.length = 0
       machine = buildMachine(prog, clockHz, onByte)
+      attachListeners(machine)
     },
 
     runFor(micros) {
@@ -132,13 +177,21 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
       return values
     },
 
+    drainTransitions() {
+      const drained = transitions.slice()
+      transitions.length = 0
+      return drained
+    },
+
     serial: () => serial,
     clearSerial() {
       serial = ''
     },
     reset() {
       serial = ''
+      transitions.length = 0
       machine = buildMachine(prog, clockHz, onByte)
+      attachListeners(machine)
     },
     elapsedMicros: () => (machine.cpu.cycles / clockHz) * 1e6,
   }

@@ -269,7 +269,9 @@ export function simulate(
     const pinId = key.slice(at + 1)
     const part = partById.get(partId)
     const def = part ? defs.get(part.def) : undefined
-    if (!def?.mcu) continue
+    // Any pin that is being driven drives its net: an MCU pin, or an output of a digital
+    // peripheral such as a shift register. Only the pin needs to exist and be wired.
+    if (!def) continue
     if (!def.pins.some((pin) => pin.id === pinId)) continue
     const net = netOf(partId, pinId)
     if (net === undefined) continue

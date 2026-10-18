@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 import { loadSketch, saveSketch } from '@/lib/persist'
+import type { PartRenderState } from '@/lib/types'
 
 /**
  * shortcut: the sketch lives in a textarea, not Monaco. Monaco needs bundler worker
@@ -28,15 +29,15 @@ interface SimulationStore {
   message: string
   /** Everything written to the serial port so far. */
   serial: string
-  /** Part id -> LED brightness 0..1, pushed in by the run loop each frame. */
-  brightness: Record<string, number>
+  /** Part id -> live render state (LED brightness, lit segments, ...), set by the run loop. */
+  partState: Record<string, PartRenderState>
 
   setSource: (source: string) => void
   setStatus: (status: SimStatus) => void
   setMessage: (message: string) => void
   appendSerial: (text: string) => void
   clearSerial: () => void
-  setBrightness: (brightness: Record<string, number>) => void
+  setPartState: (partState: Record<string, PartRenderState>) => void
 }
 
 /** Coalesce writes while the user types; the sketch is tiny but keystrokes are frequent. */
@@ -51,7 +52,7 @@ export const useSimulation = create<SimulationStore>((set) => ({
   status: 'idle',
   message: '',
   serial: '',
-  brightness: {},
+  partState: {},
 
   setSource: (source) => {
     persistSoon(source)
@@ -61,5 +62,5 @@ export const useSimulation = create<SimulationStore>((set) => ({
   setMessage: (message) => set({ message }),
   appendSerial: (text) => set((s) => ({ serial: (s.serial + text).slice(-20000) })),
   clearSerial: () => set({ serial: '' }),
-  setBrightness: (brightness) => set({ brightness }),
+  setPartState: (partState) => set({ partState }),
 }))
