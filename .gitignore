@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Never commit local secrets; the app needs none, so anything here is a mistake.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
