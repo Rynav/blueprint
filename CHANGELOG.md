@@ -1,6 +1,27 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.4.0] - 2026-10-18
+
+### Bug Fixes
+- (**compile**) add the Arduino.h include the toolchain expects
+- shortcut: no automatic function-prototype generation, which the real IDE also does; a helper defined after loop() must be forward-declared by hand.
+
+
+### Features
+- (**compile**) in-browser WASM sketch compiler in a worker
+- shortcut: the toolchain binaries are GPLv3 and ~53 MB, fetched at runtime rather than committed. Only the libraries precompiled into the package are linkable; there is no Library Manager. compileSketch has no timeout or cancellation.
+- (**avr**) atmega328p runtime harness with timers, GPIO and serial
+- shortcut: atmega328p only, no ADC input, no EEPROM persistence and no external interrupts from wired pins yet.
+- (**circuit**) drive the solver from the netlist and light the LEDs
+- shortcut: no capacitors or inductors, no PWM averaging (a pin is a hard 5 V or 0 V per solve), button state comes from params.pressed rather than UI, no MOSFET or BJT.
+- (**ui**) sketch editor, serial monitor, build output and the run loop
+- shortcut: a plain textarea rather than Monaco, whose bundler worker config cannot be verified without a browser. Monaco in P4.
+
+
+### Tests
+- end-to-end blink check and the full gate
+
 ## [0.3.0] - 2026-10-18
 
 ### Bug Fixes

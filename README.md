@@ -25,6 +25,29 @@ is the lockfile and must be committed. Use `bun` / `bunx` for everything.
 Other scripts: `bun run preview` (serve the production build), `bun run changelog:preview`
 (print unreleased entries without writing the file).
 
+## Compile toolchain (P3)
+
+Arduino C++ is compiled **entirely in the browser** — there is no build server. Sketches are
+compiled to Intel HEX by AVR GCC and binutils built for WebAssembly
+([`@horang-corp/avr-gcc-wasm`](https://www.npmjs.com/package/@horang-corp/avr-gcc-wasm)),
+and the resulting HEX is executed by [`avr8js`](https://github.com/wokwi/avr8js).
+
+Three things to know before deploying this anywhere public:
+
+- **Licence.** The toolchain binaries are **GPLv3** (GCC + binutils). Serving them to a
+  visitor's browser is distribution, which carries a corresponding-source obligation.
+  Fine for local use; get it reviewed before a commercial release.
+- **Weight.** ~53 MB of WASM and prebuilt Arduino objects are fetched at compile time and
+  are deliberately **not** committed to the repo. `vite-plugin-avr-assets.ts` serves them at
+  `/avr/` in dev and copies them into `dist/avr/` on build. The bundler additionally emits
+  `cc1plus.wasm` (~14 MB) into `dist/assets/` because the package's Emscripten glue imports it
+  statically; the runtime uses `/avr/tools/` instead, so that copy is redundant.
+- **Libraries.** Only the libraries precompiled into that package are linkable (Servo, Wire,
+  SPI, Adafruit GFX/SSD1306/BMP085/BusIO, DHT, VL53L0X…). There is no Library Manager.
+
+`compileSketch()` runs in a Web Worker so the canvas never stutters; `compileSketchInline()`
+runs on the current thread and is what the headless tests use.
+
 ## Status / roadmap
 
 | Phase | Scope                                  | Status |
@@ -32,7 +55,7 @@ Other scripts: `bun run preview` (serve the production build), `bun run changelo
 | P0    | App shell (four-panel blueprint layout) | done   |
 | P1    | Canvas editor (pan, zoom, parts, wiring) | done   |
 | P2    | SPICE core (analog simulation)          | done   |
-| P3    | Blink end-to-end (in-browser Arduino C++ compile) | – |
+| P3    | Blink end-to-end (in-browser Arduino C++ compile) | done   |
 | P4    | Library expansion                       | –      |
 | P5    | Pico simulation                         | –      |
 
