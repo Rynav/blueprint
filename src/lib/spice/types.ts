@@ -61,7 +61,46 @@ export interface Switch {
   rOpen?: number
 }
 
-export type SpiceElement = Resistor | VoltageSource | CurrentSource | Diode | Switch
+/** Bipolar junction transistor. NPN conducts collector -> emitter; PNP is mirrored. */
+export interface Bjt {
+  kind: 'bjt'
+  /** Base, collector, emitter node names. */
+  b: string
+  c: string
+  e: string
+  /** true = NPN, false = PNP. */
+  npn: boolean
+  /** Transport saturation current, amps. Default 1e-14. */
+  is?: number
+  /** Forward current gain (beta). Default 100. */
+  gain?: number
+  /** Reverse current gain (BR) for the base-collector junction. Default 1. */
+  gainReverse?: number
+}
+
+/** Enhancement-mode MOSFET. */
+export interface Mosfet {
+  kind: 'mosfet'
+  /** Gate, drain, source node names. */
+  g: string
+  d: string
+  s: string
+  /** true = N-channel, false = P-channel. */
+  n: boolean
+  /** Threshold voltage, volts. Default 2.1 (a logic-level N-FET). */
+  vth?: number
+  /** Transconductance parameter, A/V^2. Default 0.05. */
+  kp?: number
+}
+
+export type SpiceElement =
+  | Resistor
+  | VoltageSource
+  | CurrentSource
+  | Diode
+  | Switch
+  | Bjt
+  | Mosfet
 
 export interface SolveOptions {
   /** The one node held at 0 V. Must appear in the element list. */
