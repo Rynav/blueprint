@@ -22,15 +22,59 @@ export function gridStyle(vp: Viewport): CSSProperties {
   }
 }
 
-// shortcut: plain L-shaped elbow, no obstacle avoidance. Upgrade when wires cross parts often.
-export function wirePath(a: Vec, b: Vec): string {
-  const mx = (a.x + b.x) / 2
-  return `M ${a.x} ${a.y} L ${mx} ${a.y} L ${mx} ${b.y} L ${b.x} ${b.y}`
+// Pin-edge-aware orthogonal routing.
+/** How far a wire runs straight out of a pin before it is allowed to turn. */
+export const WIRE_STUB = 14
+
+/**
+ * Leaves the source pin straight out of the edge it sits on when the target lies
+ * on that side, so a wire visibly comes out of the pin rather than cutting back
+ * through the part. When the target is behind the pin, both directions would have
+ * to reverse, so it falls back to a plain elbow (which stays clear of board edges).
+ * shortcut: no obstacle avoidance, and only the source end is edge-aligned; upgrade when wires cross parts often.
+ */
+export function wirePoints(a: Vec, aDir: Vec, b: Vec): Vec[] {
+  const targetIsOutward =
+    aDir.x !== 0 ? Math.sign(b.x - a.x) === aDir.x : Math.sign(b.y - a.y) === aDir.y
+
+  if (!targetIsOutward) {
+    const mx = (a.x + b.x) / 2
+    return [a, { x: mx, y: a.y }, { x: mx, y: b.y }, b]
+  }
+
+  const p1 = { x: a.x + aDir.x * WIRE_STUB, y: a.y + aDir.y * WIRE_STUB }
+  if (aDir.y !== 0) {
+    const mx = (p1.x + b.x) / 2
+    return [a, p1, { x: mx, y: p1.y }, { x: mx, y: b.y }, b]
+  }
+  return [a, p1, { x: p1.x, y: b.y }, b]
 }
 
-/** Label anchor: middle of the elbow's vertical leg. */
-export function wireMidpoint(a: Vec, b: Vec): Vec {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+export function toPath(pts: Vec[]): string {
+  return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+}
+
+/** Point halfway along the routed polyline, for anchoring the wire label. */
+export function polylineMidpoint(pts: Vec[]): Vec {
+  const segs: number[] = []
+  let total = 0
+  for (let i = 1; i < pts.length; i++) {
+    const len = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
+    segs.push(len)
+    total += len
+  }
+  let remaining = total / 2
+  for (let i = 0; i < segs.length; i++) {
+    if (remaining <= segs[i] || i === segs.length - 1) {
+      const t = segs[i] === 0 ? 0 : remaining / segs[i]
+      return {
+        x: pts[i].x + (pts[i + 1].x - pts[i].x) * t,
+        y: pts[i].y + (pts[i + 1].y - pts[i].y) * t,
+      }
+    }
+    remaining -= segs[i]
+  }
+  return pts[pts.length - 1]
 }
 
 export function noteBounds(at: Vec) {

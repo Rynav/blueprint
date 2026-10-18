@@ -11,12 +11,14 @@ import {
   PlaceholderPart,
   gridStyle,
   noteBounds,
-  wireMidpoint,
-  wirePath,
+  polylineMidpoint,
+  toPath,
+  wirePoints,
 } from '@/components/canvas/render'
 import {
   hitTestPart,
   partBounds,
+  pinDir,
   pinWorld,
   rectsIntersect,
   screenToWorld,
@@ -71,10 +73,14 @@ export function Canvas() {
     return part && pin ? { part, pin } : null
   }
 
-  const pinOf = (partId: string, pinId: string): Vec | undefined => {
+  /** Pin position plus the outward direction of the edge it sits on. */
+  const pinAnchor = (partId: string, pinId: string): { p: Vec; dir: Vec } | null => {
     const part = useDiagram.getState().diagram.parts.find((p) => p.id === partId)
     const def = part && defs.get(part.def)
-    return part && def ? pinWorld(part, def, pinId) : undefined
+    if (!part || !def) return null
+    const p = pinWorld(part, def, pinId)
+    const dir = pinDir(part, def, pinId)
+    return p && dir ? { p, dir } : null
   }
 
   // Zoom about the pointer. Non-passive so preventDefault actually stops page zoom/scroll.
@@ -306,13 +312,13 @@ export function Canvas() {
     if (!mod && key === 'r') store.rotateSelection()
   }
 
-  const wireEnds = (wire: Wire): [Vec, Vec] | null => {
-    const a = pinOf(wire.from.part, wire.from.pin)
-    const b = pinOf(wire.to.part, wire.to.pin)
-    return a && b ? [a, b] : null
+  const wirePointsOf = (wire: Wire): Vec[] | null => {
+    const a = pinAnchor(wire.from.part, wire.from.pin)
+    const b = pinAnchor(wire.to.part, wire.to.pin)
+    return a && b ? wirePoints(a.p, a.dir, b.p) : null
   }
 
-  const previewFrom = wiring ? pinOf(wiring.from.part, wiring.from.pin) : undefined
+  const previewFrom = wiring ? pinAnchor(wiring.from.part, wiring.from.pin) : null
   const cursor = panning ? 'grabbing' : space ? 'grab' : wiring || hoverPin ? 'crosshair' : 'default'
 
   return (
@@ -351,11 +357,10 @@ export function Canvas() {
           transform={`translate(${-viewport.x * viewport.zoom} ${-viewport.y * viewport.zoom}) scale(${viewport.zoom})`}
         >
           {diagram.wires.map((wire) => {
-            const ends = wireEnds(wire)
-            if (!ends) return null
-            const [a, b] = ends
-            const d = wirePath(a, b)
-            const mid = wireMidpoint(a, b)
+            const pts = wirePointsOf(wire)
+            if (!pts) return null
+            const d = toPath(pts)
+            const mid = polylineMidpoint(pts)
             const isSel = selected.has(wire.id)
             const labelW = (wire.label?.length ?? 0) * 6.4 + 6
             return (
@@ -399,11 +404,9 @@ export function Canvas() {
           })}
 
           {wiring && previewFrom ? (
-            <line
-              x1={previewFrom.x}
-              y1={previewFrom.y}
-              x2={wiring.cursor.x}
-              y2={wiring.cursor.y}
+            <path
+              d={toPath(wirePoints(previewFrom.p, previewFrom.dir, wiring.cursor))}
+              fill="none"
               stroke={ACCENT}
               strokeWidth={2}
               strokeDasharray="5 4"

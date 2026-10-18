@@ -11,9 +11,9 @@ export function snapVec(v: Vec): Vec {
   return { x: snap(v.x), y: snap(v.y) }
 }
 
-/** Rotate a point by `turns` quarter-turns clockwise about the origin. */
-function rotateAboutOrigin(p: Vec, turns: number): Vec {
-  switch (((turns % 4) + 4) % 4) {
+/** Rotate a point clockwise about the origin by `degrees` (0/90/180/270), matching SVG's rotate(). */
+function rotateAboutOrigin(p: Vec, degrees: number): Vec {
+  switch ((((Math.round(degrees / 90) % 4) + 4) % 4)) {
     case 1:
       return { x: -p.y, y: p.x }
     case 2:
@@ -45,6 +45,30 @@ export function worldToLocal(part: PartInstance, def: PartDef, world: Vec): Vec 
 export function pinWorld(part: PartInstance, def: PartDef, pinId: string): Vec | undefined {
   const pin = def.pins.find((p) => p.id === pinId)
   return pin ? localToWorld(part, def, pin) : undefined
+}
+
+/**
+ * Outward unit vector at a pin, rotated with the part: the edge of the part's box
+ * the pin sits on. Lets wires leave and enter along the pin instead of running
+ * back through the component.
+ */
+export function pinDir(part: PartInstance, def: PartDef, pinId: string): Vec | undefined {
+  const pin = def.pins.find((p) => p.id === pinId)
+  if (!pin) return undefined
+  const left = pin.x
+  const right = def.width - pin.x
+  const top = pin.y
+  const bottom = def.height - pin.y
+  const min = Math.min(left, right, top, bottom)
+  const dir =
+    min === left
+      ? { x: -1, y: 0 }
+      : min === right
+        ? { x: 1, y: 0 }
+        : min === top
+          ? { x: 0, y: -1 }
+          : { x: 0, y: 1 }
+  return rotateAboutOrigin(dir, part.rotation)
 }
 
 /** World axis-aligned bounding box of a placed part. */
