@@ -3,6 +3,7 @@ import { basicParts } from './basic'
 import { boardParts } from './boards'
 import { breadboardParts } from './breadboard'
 import { deviceParts } from './devices'
+import { digitalParts } from './digital'
 import { powerParts } from './power'
 
 export interface PartCategory {
@@ -23,9 +24,17 @@ export const PART_CATEGORIES: PartCategory[] = [
   { id: 'sensors', name: 'Sensors' },
   { id: 'motors', name: 'Motors' },
   { id: 'sound', name: 'Sound' },
+  { id: 'digital', name: 'Digital' },
 ]
 
-const PARTS: PartDef[] = [...boardParts, ...breadboardParts, ...powerParts, ...basicParts, ...deviceParts]
+const PARTS: PartDef[] = [
+  ...boardParts,
+  ...breadboardParts,
+  ...powerParts,
+  ...basicParts,
+  ...deviceParts,
+  ...digitalParts,
+]
 const BY_ID = new Map(PARTS.map((p) => [p.id, p]))
 
 /** Every registered part, in palette order. Treat as read-only. */
