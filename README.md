@@ -56,7 +56,8 @@ runs on the current thread and is what the headless tests use.
 | P1    | Canvas editor (pan, zoom, parts, wiring) | done   |
 | P2    | SPICE core (analog simulation)          | done   |
 | P3    | Blink end-to-end (in-browser Arduino C++ compile) | done   |
-| P4    | Library expansion                       | –      |
+| P4a   | Analog devices, models and inspector params | done   |
+| P4b   | Digital peripherals (displays, shift registers, keypads) | – |
 | P5    | Pico simulation                         | –      |
 
 ## Conventional Commits

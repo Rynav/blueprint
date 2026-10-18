@@ -1,6 +1,19 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.5.0] - 2026-10-18
+
+### Features
+- (**spice**) two-junction Ebers-Moll BJT and square-law MOSFET
+- shortcut: no Early effect or emitter/collector series resistance, so Vce(sat) sits near 40 mV rather than a real device's 100-200 mV. No subthreshold or mobility terms in the FET model.
+- (**parts**) analog device library and circuit mapping
+- shortcut: the motor is coil resistance only, with no inductance, back-EMF or speed under PWM. No transistor body diode. LED and diode forward voltages do not drift with temperature.
+- (**ui**) edit part parameters in the inspector
+
+
+### Tests
+- (**devices**) independent hand-computed device checks
+
 ## [0.4.0] - 2026-10-18
 
 ### Bug Fixes
