@@ -71,6 +71,11 @@ export function useRunner() {
       sim.setStatus('running')
 
       const frame = () => {
+        // Levels BEFORE the CPU runs are the start-of-frame state the replay must begin from.
+        // Seeding with the end-of-frame values instead breaks any device that latches several
+        // pins at once (a parallel LCD reading RS and data on an Enable edge).
+        const startPins = runtime.pinValues()
+
         runtime.runFor(FRAME_MICROS)
         const diagram = useDiagram.getState().diagram
 
@@ -83,13 +88,12 @@ export function useRunner() {
         // CPU produced this frame, in order, before sampling the final levels. One harness per
         // frame: the wiring can change while the sketch runs.
         const harness = createDeviceHarness(diagram, defs, deviceState.current, duty)
-        // Seed before replaying: a pin that did not change this frame emits no transition, so
-        // without the seed the first clock edge reads 'z' instead of the pin's real level.
-        const livePins = runtime.pinValues()
-        harness.seed(livePins)
+        harness.seed(startPins)
         for (const { key, value } of runtime.drainTransitions()) {
           if (harness.watched.has(key)) harness.applyTransition(key, value)
         }
+        // Now the CPU has run, so these are the end-of-frame levels: what the solve should see.
+        const livePins = runtime.pinValues()
         // Analog state is only solved once per frame: intermediate solves are invisible at
         // 60 fps, and the merge below already carries the devices' final outputs.
         const pins = harness.settle(livePins, FRAME_MICROS)

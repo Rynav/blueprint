@@ -51,13 +51,16 @@ const t0 = performance.now()
 
 for (let frame = 0; frame < 60; frame++) {
   const f0 = performance.now()
+  // Start-of-frame levels: an end-of-frame seed misreads a device that latches two
+  // pins at once, so the replay must begin from before the CPU ran.
+  const startPins = runtime.pinValues()
   runtime.runFor(FRAME)
   const harness = createDeviceHarness(diagram, defs, state)
-  const pins = runtime.pinValues()
-  harness.seed(pins) // seed before replay: unchanged pins emit no transition
+  harness.seed(startPins)
   const transitions = runtime.drainTransitions()
   traces.push(transitions.map((t) => `${t.key.split(':')[1]}=${t.value}`))
   for (const t of transitions) harness.applyTransition(t.key, t.value)
+  const pins = runtime.pinValues()
   const merged = harness.settle(pins, FRAME)
   const circuit = simulate(diagram, defs, merged)
   frameMs.push(performance.now() - f0)

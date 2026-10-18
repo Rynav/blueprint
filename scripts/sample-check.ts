@@ -50,15 +50,17 @@ async function open(jsonPath: string, source: string, sensors?: string[]): Promi
 
 /** Exactly the app's frame ordering. */
 function step(scene: Scene): CircuitState {
+  // Start-of-frame levels, exactly as use-runner captures them before the CPU runs.
+  const startPins = scene.runtime.pinValues()
   scene.runtime.runFor(FRAME)
   // Duty over the frame just run: this is what makes a PWM pin dim rather than flicker.
   const duty = scene.runtime.pinDuty()
   const harness = createDeviceHarness(scene.diagram, scene.defs, scene.state, duty)
-  const livePins = scene.runtime.pinValues()
-  harness.seed(livePins)
+  harness.seed(startPins)
   for (const t of scene.runtime.drainTransitions()) {
     if (harness.watched.has(t.key)) harness.applyTransition(t.key, t.value)
   }
+  const livePins = scene.runtime.pinValues()
   const pins = harness.settle(livePins, FRAME)
 
   const prefix = `${scene.boardId}:`

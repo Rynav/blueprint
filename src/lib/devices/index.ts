@@ -30,11 +30,13 @@ export interface DeviceHarness {
   /** Pins on a net that any device reads, so a caller can ignore irrelevant churn. */
   readonly watched: Set<string>
   /**
-   * Seed every net from a full pin map. **Call this before replaying a frame's
-   * transitions**: a pin that did not change during the frame produces no transition,
-   * so without a seed the first device to read it sees 'z' instead of its real level.
-   * (A pin that did not change has the same value at the start and end of the frame,
-   * so end-of-frame values are the correct seed.)
+   * Seed every net with the pin levels **as they were at the START of the frame**,
+   * i.e. the values from before `runFor`, then replay the frame's transitions. Order
+   * matters: a pin that changes later in the frame must hold its *start* value while
+   * the earlier edges are replayed, or a device latching several pins at once (a
+   * parallel LCD reading RS and its data lines on an Enable edge) misreads them.
+   * An end-of-frame seed looks equivalent for a one-bit device and is wrong the moment
+   * two latched pins move in the same frame.
    */
   seed(mcuPinValues: Map<string, PinValue>): void
   /** Apply one pin transition, stepping only the devices that read that pin's net. */
