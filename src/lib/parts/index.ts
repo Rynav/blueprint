@@ -6,7 +6,9 @@ import { deviceParts } from './devices'
 import { digitalParts } from './digital'
 import { displayParts } from './display'
 import { keypad } from './keypad'
+import { lcd } from './lcd'
 import { powerParts } from './power'
+import { joystick, uln2003 } from './sensors'
 import { servoPart } from './servo'
 
 export interface PartCategory {
@@ -38,6 +40,9 @@ const PARTS: PartDef[] = [
   ...deviceParts,
   servoPart,
   keypad,
+  uln2003,
+  joystick,
+  lcd,
   ...digitalParts,
   ...displayParts,
 ]
