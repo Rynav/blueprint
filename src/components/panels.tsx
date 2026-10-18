@@ -1,18 +1,19 @@
 import type { ReactNode } from 'react'
-import { CircuitBoard, FilePlus2, FolderOpen, Play, Search } from 'lucide-react'
+import { CircuitBoard, Play } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
-const VERSION = 'v0.1.0'
+/**
+ * shortcut: version string hardcoded here; inject from package.json at build time
+ * when release automation needs a single source of truth.
+ */
+const VERSION = 'v0.2.0'
 
-/** Shared panel chrome: uppercase title bar + scrollable body. */
-function Panel({
+/** Shared panel chrome: uppercase title bar + body. */
+export function Panel({
   title,
   actions,
   children,
@@ -46,95 +47,13 @@ export function TopBar() {
           {VERSION}
         </Badge>
       </div>
-
-      <Separator orientation="vertical" className="!h-5" />
-
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm" disabled>
-          <FilePlus2 />
-          New
-        </Button>
-        <Button variant="ghost" size="sm" disabled>
-          <FolderOpen />
-          Open
-        </Button>
-      </div>
-
       <div className="ml-auto">
-        <Button size="sm" disabled>
+        <Button size="sm" disabled title="Compiling and running lands in P3">
           <Play />
           Run
         </Button>
       </div>
     </header>
-  )
-}
-
-const PART_CATEGORIES = [
-  'Boards',
-  'Breadboards',
-  'Power',
-  'LEDs',
-  'Resistors',
-  'Buttons & switches',
-  'Displays',
-  'Motors & servos',
-  'Sensors',
-  'Sound',
-  'ICs & logic',
-  'Wires & probes',
-] as const
-
-export function PartsPalette() {
-  return (
-    <Panel
-      title="Parts"
-      actions={
-        <Badge variant="outline" className="font-mono text-[10px] text-muted-foreground">
-          {PART_CATEGORIES.length}
-        </Badge>
-      }
-    >
-      <div className="flex h-full flex-col">
-        <div className="relative shrink-0 p-2">
-          <Search className="pointer-events-none absolute top-1/2 left-4 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search parts…" className="h-8 pl-7 text-xs" disabled />
-        </div>
-        <ScrollArea className="min-h-0 flex-1">
-          <ul className="space-y-0.5 p-2 pt-0">
-            {PART_CATEGORIES.map((category) => (
-              <li key={category}>
-                <button
-                  type="button"
-                  disabled
-                  className="w-full rounded-md px-2 py-1.5 text-left text-xs text-muted-foreground/80 hover:bg-accent/50"
-                >
-                  {category}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="px-3 pb-3 text-[10px] text-muted-foreground/60">
-            Data-driven registry lands in P1.
-          </p>
-        </ScrollArea>
-      </div>
-    </Panel>
-  )
-}
-
-export function BlueprintCanvas() {
-  return (
-    <div className="blueprint-grid relative h-full w-full">
-      <div className="pointer-events-none absolute inset-0 grid place-items-center">
-        <div className="text-center">
-          <p className="font-mono text-xs tracking-[0.3em] text-primary/70 uppercase">canvas</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Pan, zoom, parts and wiring arrive in P1.
-          </p>
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -175,27 +94,15 @@ export function BottomPanel() {
   )
 }
 
-export function Inspector() {
-  return (
-    <Panel title="Inspector">
-      <div className="grid h-full place-items-center p-4">
-        <p className="text-center text-xs text-muted-foreground">Nothing selected.</p>
-      </div>
-    </Panel>
-  )
-}
-
-export function StatusBar() {
+export function StatusBar({ saved }: { saved: boolean }) {
   return (
     <footer className="flex h-7 shrink-0 items-center gap-3 border-t bg-sidebar px-3 font-mono text-[10px] text-muted-foreground">
       <span className="flex items-center gap-1.5">
-        <span className="size-1.5 rounded-full bg-muted-foreground/50" />
-        persist: idle
+        <span className={cn('size-1.5 rounded-full', saved ? 'bg-emerald-400' : 'bg-amber-400')} />
+        persist: {saved ? 'saved' : 'saving…'}
       </span>
       <span>sim: off</span>
-      <span className="ml-auto">
-        milestone p0 · {VERSION}
-      </span>
+      <span className="ml-auto">milestone p1 · {VERSION}</span>
     </footer>
   )
 }
