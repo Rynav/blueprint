@@ -1,6 +1,26 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.11.0] - 2026-10-18
+
+### Bug Fixes
+- (**devices**) seed a frame's replay with start-of-frame levels
+
+
+### Documentation
+- record why the Pico milestone is blocked
+
+
+### Features
+- (**parts**) parallel 16x2 LCD (HD44780)
+- shortcut: the DDRAM is 2x16 with the cursor wrapping at 16, where real hardware is 40 chars per line; CGRAM, the busy flag and display shift are not modelled, and the canvas draws characters as monospace text rather than the 5x8 glyph ROM.
+- (**parts**) stepper on a ULN2003 board, and an analog joystick
+- shortcut: the stepper coils are deliberately not an electrical load - no coil resistance, holding torque or back-EMF - and only the half-step sequence is decoded, so full-step and wave drive read as out-of-order.
+
+
+### Maintenance
+- register the LCD, stepper and joystick and gate their suites
+
 ## [0.10.0] - 2026-10-18
 
 ### Features

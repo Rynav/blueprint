@@ -156,6 +156,7 @@ exactly that, because it is easy to mistake for a code error.
 | P4d   | PWM averaging and a live pin voltmeter | done   |
 | P4e   | I²C/SPI displays (OLED, LCD)            | done (OLED) |
 | P4f   | Servo and a 4x4 keypad (library depth)  | done   |
+| P4g   | Parallel LCD, stepper and joystick      | done   |
 | P5    | Pico simulation                         | blocked — no ARM toolchain |
 
 ## Conventional Commits
