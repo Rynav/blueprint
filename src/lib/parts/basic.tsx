@@ -85,7 +85,7 @@ const resistor: PartDef = {
   ),
 }
 
-// shortcut: 4-pin tactile switch is drawn as 4 independent passive pins; the 1a-1b / 2a-2b internal ties are not modelled yet.
+// The two pins on each side are tied inside the switch; the a/b throw across the middle is not modelled.
 const pushbutton: PartDef = {
   id: 'pushbutton',
   name: 'Push Button',
@@ -97,6 +97,10 @@ const pushbutton: PartDef = {
     { id: '1b', label: '1b', x: 0, y: 45, kind: 'passive' },
     { id: '2a', label: '2a', x: 60, y: 15, kind: 'passive' },
     { id: '2b', label: '2b', x: 60, y: 45, kind: 'passive' },
+  ],
+  internalNets: [
+    ['1a', '1b'],
+    ['2a', '2b'],
   ],
   render: () => (
     <>

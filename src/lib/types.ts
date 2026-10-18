@@ -30,6 +30,12 @@ export interface PartDef {
   width: number
   height: number
   pins: PinDef[]
+  /**
+   * Groups of pin ids that are permanently shorted inside the part: breadboard
+   * column rows, switch poles, multi-terminal connectors. The netlist unions each
+   * group. Omitted means every pin is independent.
+   */
+  internalNets?: string[][]
   /** Draws the part in its local frame. Must not mutate anything. */
   render: (props: { part: PartInstance; def: PartDef }) => ReactNode
 }

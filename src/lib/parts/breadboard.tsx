@@ -26,7 +26,14 @@ const RAIL_Y = { tp: 12, tn: 22, bp: 158, bn: 168 }
 const RAIL_P = '#ef4444'
 const RAIL_N = '#3b82f6'
 
-// shortcut: breadboard internal bus connections are not modelled yet, only hole pins; add row/rail nets in P2.
+// Each column half is one bus: a-e share a node, f-j share another.
+const TOP_ROWS = ['a', 'b', 'c', 'd', 'e']
+const BOTTOM_ROWS = ['f', 'g', 'h', 'i', 'j']
+const bbInternalNets: string[][] = Array.from({ length: COLS }, (_, i) =>
+  [TOP_ROWS, BOTTOM_ROWS].map((rows) => rows.map((r) => `${r}${i + 1}`)),
+).flat()
+
+// shortcut: the four rails are a single pin each, not a row of holes, so they need no internal group; widen this when the rails are redrawn as per-column holes.
 const bbPins: PinDef[] = [
   { id: 'tp+', label: 'TP+', x: 20, y: RAIL_Y.tp, kind: 'power' },
   { id: 'tp-', label: 'TP-', x: 20, y: RAIL_Y.tn, kind: 'ground' },
@@ -76,6 +83,7 @@ const breadboardHalf: PartDef = {
   width: BB_W,
   height: BB_H,
   pins: bbPins,
+  internalNets: bbInternalNets,
   render: () => (
     <>
       <rect x={0} y={0} width={BB_W} height={BB_H} rx={5} fill={BODY} stroke={LINE} strokeWidth={1.5} />
