@@ -31,6 +31,8 @@ interface SimulationStore {
   serial: string
   /** Part id -> live render state (LED brightness, lit segments, ...), set by the run loop. */
   partState: Record<string, PartRenderState>
+  /** Net id -> solved volts, set by the run loop. Lets the UI show what a pin is reading. */
+  volts: Record<string, number>
 
   setSource: (source: string) => void
   setStatus: (status: SimStatus) => void
@@ -38,6 +40,7 @@ interface SimulationStore {
   appendSerial: (text: string) => void
   clearSerial: () => void
   setPartState: (partState: Record<string, PartRenderState>) => void
+  setVolts: (volts: Record<string, number>) => void
 }
 
 /** Coalesce writes while the user types; the sketch is tiny but keystrokes are frequent. */
@@ -53,6 +56,7 @@ export const useSimulation = create<SimulationStore>((set) => ({
   message: '',
   serial: '',
   partState: {},
+  volts: {},
 
   setSource: (source) => {
     persistSoon(source)
@@ -63,4 +67,5 @@ export const useSimulation = create<SimulationStore>((set) => ({
   appendSerial: (text) => set((s) => ({ serial: (s.serial + text).slice(-20000) })),
   clearSerial: () => set({ serial: '' }),
   setPartState: (partState) => set({ partState }),
+  setVolts: (volts) => set({ volts }),
 }))

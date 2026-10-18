@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Download, FilePlus2, Redo2, RotateCw, Trash2, Undo2, Upload } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { getPartDef } from '@/lib/parts'
+import { buildNets } from '@/lib/netlist'
+import { allPartDefs, getPartDef } from '@/lib/parts'
 import { downloadDiagram, readDiagramFile } from '@/lib/persist'
 import type { Diagram, Endpoint, Note, PartInstance, Wire } from '@/lib/types'
 import { useDiagram } from '@/store/diagram'
+import { useSimulation } from '@/store/simulation'
 
 /** Preset swatches shared by notes and wires. */
 const COLORS = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#64748b']
@@ -134,10 +136,16 @@ function ProjectPanel({ diagram }: { diagram: Diagram }) {
   )
 }
 
-function PartPanel({ part }: { part: PartInstance }) {
+function PartPanel({ part, diagram }: { part: PartInstance; diagram: Diagram }) {
   const def = getPartDef(part.def)
   const setPartLabel = useDiagram((s) => s.setPartLabel)
   const setPartParam = useDiagram((s) => s.setPartParam)
+  const volts = useSimulation((s) => s.volts)
+  // The netlist is only rebuilt when the wiring changes, not every frame.
+  const nets = useMemo(
+    () => buildNets(diagram, new Map(allPartDefs().map((d) => [d.id, d]))),
+    [diagram],
+  )
   const rotateSelection = useDiagram((s) => s.rotateSelection)
   const deleteSelection = useDiagram((s) => s.deleteSelection)
   const pushHistory = useDiagram((s) => s.pushHistory)
@@ -198,18 +206,27 @@ function PartPanel({ part }: { part: PartInstance }) {
         <p className="mb-1 text-[10px] tracking-widest text-muted-foreground uppercase">Pins</p>
         <ScrollArea className="min-h-0 flex-1">
           <ul className="space-y-0.5 pr-2">
-            {(def?.pins ?? []).map((pin) => (
-              <li
-                key={pin.id}
-                className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1"
-              >
-                <span className="font-mono text-[11px]">
-                  {pin.id}
-                  {pin.label ? ` · ${pin.label}` : ''}
-                </span>
-                <span className="text-[10px] text-muted-foreground">{pin.kind}</span>
-              </li>
-            ))}
+            {(def?.pins ?? []).map((pin) => {
+              const net = nets.netOf(part.id, pin.id)
+              const v = net === undefined ? undefined : volts[net]
+              return (
+                <li
+                  key={pin.id}
+                  className="flex items-center justify-between rounded-md bg-muted/40 px-2 py-1"
+                >
+                  <span className="font-mono text-[11px]">
+                    {pin.id}
+                    {pin.label ? ` · ${pin.label}` : ''}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] text-primary">
+                      {v === undefined ? '—' : `${v.toFixed(2)} V`}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{pin.kind}</span>
+                  </span>
+                </li>
+              )
+            })}
             {(def?.pins ?? []).length === 0 && (
               <li className="px-2 py-1 text-[10px] text-muted-foreground">Unknown part definition.</li>
             )}
@@ -338,7 +355,7 @@ export function Inspector() {
 
   const id = selection[0]
   const part = diagram.parts.find((p) => p.id === id)
-  if (part) return <PartPanel part={part} />
+  if (part) return <PartPanel part={part} diagram={diagram} />
   const note = diagram.notes.find((n) => n.id === id)
   if (note) return <NotePanel note={note} />
   const wire = diagram.wires.find((w) => w.id === id)
