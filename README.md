@@ -40,6 +40,22 @@ The intelligence is a curated table in `src/lib/editor/arduino-api.ts`, not a la
 functions, it is unit-tested, including a check that every API name the shipped examples use
 is actually documented.
 
+## Operating parts with the mouse
+
+Switches, buttons, potentiometers and the joystick can be **worked directly on the canvas**:
+click a button to press it, click a slide switch to latch it, drag a potentiometer's knob to
+turn it, drag the joystick to deflect it. Each shows the change — the actuator sinks, the
+slider moves to its end, the knob's pointer rotates, the stick tilts.
+
+Each part declares its own **control hotspot** (the actuator, the slider, the knob, the well),
+so dragging the control operates it and dragging anywhere else on the part still moves the
+part. The cursor changes over a hotspot, since a part cannot draw its own affordance.
+
+Semantics follow the hardware rather than convenience: a push button is **momentary** (held
+while the mouse is down, so `while (digitalRead(2) == LOW)` behaves), a slide switch
+**latches**, and the joystick **self-centres** on release. A two-axis drag moves both
+parameters in one gesture.
+
 ## Compile toolchain (P3)
 
 Arduino C++ is compiled **entirely in the browser** — there is no build server. Sketches are
@@ -105,9 +121,9 @@ void loop() {
 
 ### `examples/button-led.json`
 
-A **button that actually controls an LED** — the sketch reads the circuit. Import it, then
-paste this over the sketch and press Run, then flip the button's **Pressed** parameter in the
-Inspector:
+A **button that actually controls an LED** — the sketch reads the circuit. Import it, paste
+this over the sketch, press Run, then **click the button on the canvas** (or set its *Pressed*
+parameter in the Inspector):
 
 ```cpp
 void setup() {
@@ -173,6 +189,8 @@ exactly that, because it is easy to mistake for a code error.
 | P4f   | Servo and a 4x4 keypad (library depth)  | done   |
 | P4g   | Parallel LCD, stepper and joystick      | done   |
 | P4h   | Monaco: syntax highlighting and Arduino completions | done   |
+| P4i   | Mouse-operable switches, button, pot and joystick | done   |
+| P6    | Edge-driven input: timed devices and the ultrasonic sensor | done   |
 | P5    | Pico simulation                         | blocked — no ARM toolchain |
 
 ## License

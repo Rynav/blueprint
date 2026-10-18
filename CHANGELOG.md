@@ -1,6 +1,16 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.13.0] - 2026-10-18
+
+### Features
+- (**parts**) operate switches, buttons, pots and the joystick with the mouse
+- (**avr**) step timed devices inside the frame, and add an ultrasonic sensor
+
+
+### Maintenance
+- register the ultrasonic sensor and gate the new suites
+
 ## [0.12.0] - 2026-10-18
 
 ### Documentation
