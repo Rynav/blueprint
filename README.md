@@ -109,6 +109,8 @@ voltage — a real round trip through the circuit, one frame of latency.
 | P4a   | Analog devices, models and inspector params | done   |
 | P4b   | Digital peripherals (displays, shift registers, keypads) | done   |
 | P4c   | Input devices (buttons, keypads, analog sensors) | done   |
+| P4d   | PWM averaging and a live pin voltmeter | done   |
+| P4e   | I²C/SPI displays (OLED, LCD)            | –      |
 | P5    | Pico simulation                         | –      |
 
 ## Conventional Commits

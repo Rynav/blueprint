@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.8.0] - 2026-10-18
+
+### Features
+- (**avr**) measure per-pin PWM duty and average it into the solve
+- shortcut: the averaging is a DC equivalent - right for an LED's apparent brightness, wrong for anything sensing the switching itself (RC ripple, a speaker, motor back-EMF). Upgrade to a time-domain solve when those land.
+- (**ui**) live pin voltmeter and PWM duty in the run loop
+
+
+### Tests
+- (**sample**) verify the app frame body, including a PWM fade
+
 ## [0.7.0] - 2026-10-18
 
 ### Documentation
