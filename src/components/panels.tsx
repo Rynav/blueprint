@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
  * shortcut: version string hardcoded here; inject from package.json at build time
  * when release automation needs a single source of truth.
  */
-const VERSION = 'v0.2.0'
+const VERSION = 'v0.3.0'
 
 /** Shared panel chrome: uppercase title bar + body. */
 export function Panel({

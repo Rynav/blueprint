@@ -19,7 +19,7 @@ is the lockfile and must be committed. Use `bun` / `bunx` for everything.
 | `bun dev`              | Start the Vite dev server with HMR.                      |
 | `bun run build`        | Type-check (`tsc -b`) and build for production.          |
 | `bun run lint`         | Run oxlint.                                              |
-| `bun run check`        | Headless integration check: registry, store, undo/redo, persistence and a full-app render. |
+| `bun run check`        | Headless checks: app (registry, store, undo/redo, persistence, wire routing, netlist) plus the SPICE solver suites. `check:app` / `check:spice` run them separately. |
 | `bun run changelog`    | Regenerate `CHANGELOG.md` from Conventional Commits.     |
 
 Other scripts: `bun run preview` (serve the production build), `bun run changelog:preview`
@@ -31,7 +31,7 @@ Other scripts: `bun run preview` (serve the production build), `bun run changelo
 | ----- | -------------------------------------- | ------ |
 | P0    | App shell (four-panel blueprint layout) | done   |
 | P1    | Canvas editor (pan, zoom, parts, wiring) | done   |
-| P2    | SPICE core (analog simulation)          | –      |
+| P2    | SPICE core (analog simulation)          | done   |
 | P3    | Blink end-to-end (in-browser Arduino C++ compile) | – |
 | P4    | Library expansion                       | –      |
 | P5    | Pico simulation                         | –      |

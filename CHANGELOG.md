@@ -1,6 +1,24 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.3.0] - 2026-10-18
+
+### Bug Fixes
+- (**canvas**) keep wires on the pin, and fix rotation units
+- shortcut: routing has no obstacle avoidance and only the source end is edge-aligned; upgrade when wires cross parts often.
+
+
+### Features
+- (**spice**) dense LU and modified nodal analysis solver
+- shortcut: fixed absolute pivot floor; a conductance below ~1e-12 S would read as singular. Upgrade to a scaled pivot when sub-nanoamp paths matter.
+- (**netlist**) union-find connectivity with internal part nets
+- shortcut: breadboard rails are a single pin each rather than a row of holes; widen when the rails are redrawn.
+
+
+### Tests
+- (**netlist**) netlist suite and breadboard wiring assertions
+- (**spice**) solver suite plus independent cross-checks
+
 ## [0.2.0] - 2026-10-18
 
 ### Features
