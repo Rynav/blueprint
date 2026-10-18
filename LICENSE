@@ -19,13 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Third-party components are covered by their own licences, not the MIT licence
-above. In particular the AVR compile toolchain this app fetches at runtime
-(`@horang-corp/avr-gcc-wasm`, which packages GCC and GNU binutils built for
-WebAssembly) is GPLv3 or later. It is not part of this repository. Deploying
-this app serves those binaries to visitors, which carries the GPL's
-corresponding-source obligation. See THIRD-PARTY notices in that package and
-the "Compile toolchain" section of README.md.

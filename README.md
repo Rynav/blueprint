@@ -166,7 +166,9 @@ exactly that, because it is easy to mistake for a code error.
 The compile toolchain is **not** covered by it. `@horang-corp/avr-gcc-wasm` packages GCC and
 GNU binutils built for WebAssembly, and those are **GPLv3 or later**. They are not part of
 this repository, but deploying the app serves them to visitors, which carries the GPL's
-corresponding-source obligation — see [Compile toolchain](#compile-toolchain-p3).
+corresponding-source obligation. Full details in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and
+[Compile toolchain](#compile-toolchain-p3).
 
 ## Conventional Commits
 
