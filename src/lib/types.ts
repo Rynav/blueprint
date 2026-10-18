@@ -36,6 +36,12 @@ export interface PartDef {
    * group. Omitted means every pin is independent.
    */
   internalNets?: string[][]
+  /**
+   * Toolchain link groups this part needs, e.g. `['OLED']`. The toolchain only links
+   * libraries whose group is requested, so a part needing one must declare it or its
+   * sketch will fail to link. The compile step unions these across the diagram.
+   */
+  sensors?: string[]
   /** Default values for `PartInstance.params`, e.g. `{ ohms: 220 }`. */
   defaultParams?: Record<string, number>
   /** Present when the part is a programmable MCU board. */
@@ -70,6 +76,30 @@ export interface DeviceInput {
   dtMicros: number
 }
 
+/** A device that answers on the I2C bus. */
+export interface I2cDevice {
+  /** 7-bit address, e.g. 0x3c for an SSD1306. */
+  address: number
+  /** A START (or repeated START) addressed to this device. */
+  connect: (write: boolean) => void
+  /** A byte written by the controller. */
+  write: (value: number) => void
+  /** A byte the controller is reading; `ack` true means it wants another. */
+  read: (ack: boolean) => void
+  stop: () => void
+}
+
+/** The controller side of the I2C bus, as the AVR sees it. */
+export interface I2cBus {
+  /** Whether any device answers at this 7-bit address (the ACK decision). */
+  has: (address: number) => boolean
+  start: (repeated: boolean) => void
+  connect: (address: number, write: boolean) => boolean
+  write: (value: number) => void
+  read: () => number
+  stop: () => void
+}
+
 /**
  * A digital peripheral: a state machine that reads the levels on its pins, keeps state
  * between frames, and drives its own outputs. The MCU is not special here — a device's
@@ -88,6 +118,8 @@ export interface DeviceModel {
   ) => Record<string, 0 | 1 | 'z'>
   /** Derive render state from the device's own state, for the canvas. */
   visual?: (state: Record<string, unknown>) => PartRenderState
+  /** Present when the part sits on the I2C bus (a display, a sensor). */
+  i2c?: I2cDevice
 }
 
 /** How a board's broken-out pins map onto the emulated chip. */

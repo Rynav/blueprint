@@ -4,6 +4,7 @@ import {
   AVRIOPort,
   AVRUSART,
   AVRTimer,
+  AVRTWI,
   CPU,
   PinState,
   adcConfig,
@@ -15,9 +16,11 @@ import {
   timer0Config,
   timer1Config,
   timer2Config,
+  twiConfig,
   usart0Config,
 } from 'avr8js'
-import type { PartDef, PartInstance } from '@/lib/types'
+import type { TWIEventHandler } from 'avr8js'
+import type { I2cBus, PartDef, PartInstance } from '@/lib/types'
 
 export type PinValue = 0 | 1 | 'z'
 
@@ -76,6 +79,7 @@ interface Machine {
   cpu: CPU
   ports: Record<PortName, AVRIOPort>
   adc: AVRADC
+  twi: AVRTWI
 }
 
 /** A board pin resolved once from the mcu spec: port bit, plus its ADC channel if it has one. */
@@ -115,10 +119,47 @@ function parseIntelHex(text: string): Uint16Array {
 }
 
 /**
- * A fresh CPU with the peripherals an Arduino sketch expects. Timers and ports self-register
- * their hooks on the CPU; the USART forwards transmitted bytes to `onByte`.
+ * Bridge the AVR TWI peripheral to an I2C bus. Every TWI event must be answered with the
+ * matching `complete*` call, or the sketch's Wire transaction spins on TWINT forever (a hang).
+ * A device that ACKed its address ACKs its data bytes too, so the connect ack is reused.
  */
-function buildMachine(prog: Uint16Array, clockHz: number, onByte: (value: number) => void): Machine {
+function twiHandler(twi: AVRTWI, bus: I2cBus): TWIEventHandler {
+  let addressed = false
+  return {
+    start: (repeated) => {
+      addressed = false
+      bus.start(repeated)
+      twi.completeStart()
+    },
+    stop: () => {
+      bus.stop()
+      twi.completeStop()
+    },
+    connectToSlave: (addr, write) => {
+      addressed = bus.connect(addr, write)
+      twi.completeConnect(addressed)
+    },
+    writeByte: (value) => {
+      bus.write(value)
+      twi.completeWrite(addressed)
+    },
+    readByte: () => {
+      twi.completeRead(bus.read())
+    },
+  }
+}
+
+/**
+ * A fresh CPU with the peripherals an Arduino sketch expects. Timers and ports self-register
+ * their hooks on the CPU; the USART forwards transmitted bytes to `onByte`. When an I2C bus is
+ * supplied, the TWI peripheral routes controller traffic to it.
+ */
+function buildMachine(
+  prog: Uint16Array,
+  clockHz: number,
+  onByte: (value: number) => void,
+  i2c: I2cBus | undefined,
+): Machine {
   const cpu = new CPU(prog)
   const ports: Record<PortName, AVRIOPort> = {
     B: new AVRIOPort(cpu, portBConfig),
@@ -132,12 +173,22 @@ function buildMachine(prog: Uint16Array, clockHz: number, onByte: (value: number
   usart.onByteTransmit = onByte
   const adc = new AVRADC(cpu, adcConfig)
   adc.avcc = 5 // analogRead scales against 5 V; channelValues carry volts, not counts
-  return { cpu, ports, adc }
+  const twi = new AVRTWI(cpu, twiConfig, clockHz)
+  // With no bus the default handler NACKs everything, so a Wire sketch fails cleanly instead of
+  // hanging even when there is no display on the canvas.
+  if (i2c) twi.eventHandler = twiHandler(twi, i2c)
+  return { cpu, ports, adc, twi }
 }
 
-export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime {
+export function createAvrRuntime(
+  board: PartInstance,
+  def: PartDef,
+  options?: { i2c?: I2cBus },
+): AvrRuntime {
   const mcu = def.mcu
   if (!mcu) throw new Error(`part "${def.id}" has no mcu spec, so it cannot run firmware`)
+
+  const i2c = options?.i2c
 
   const clockHz = mcu.clockHz
   // Pin table resolved once. The per-frame path only reads a pinState and sets a Map entry.
@@ -196,7 +247,7 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
   const inputLevels = new Map<string, 0 | 1>()
   const analogVolts = new Map<string, number>()
 
-  let machine = buildMachine(prog, clockHz, onByte)
+  let machine = buildMachine(prog, clockHz, onByte, i2c)
   attachListeners(machine)
 
   /** Drive a pin's input level, unless the MCU drives it (DDR bit set). */
@@ -218,7 +269,7 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
     }
   }
   const rebuild = () => {
-    machine = buildMachine(prog, clockHz, onByte)
+    machine = buildMachine(prog, clockHz, onByte, i2c)
     attachListeners(machine)
     applyStored()
   }

@@ -4,6 +4,7 @@ import { boardParts } from './boards'
 import { breadboardParts } from './breadboard'
 import { deviceParts } from './devices'
 import { digitalParts } from './digital'
+import { displayParts } from './display'
 import { powerParts } from './power'
 
 export interface PartCategory {
@@ -34,6 +35,7 @@ const PARTS: PartDef[] = [
   ...basicParts,
   ...deviceParts,
   ...digitalParts,
+  ...displayParts,
 ]
 const BY_ID = new Map(PARTS.map((p) => [p.id, p]))
 
