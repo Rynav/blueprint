@@ -1,6 +1,16 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.9.0] - 2026-10-18
+
+### Documentation
+- (**examples**) add an Adafruit_SSD1306 hello world sample
+
+
+### Features
+- (**devices**) SSD1306 OLED on a simulated I2C bus
+- (**compile**) link the object group a part declares
+
 ## [0.8.0] - 2026-10-18
 
 ### Features

@@ -14,7 +14,7 @@ import { useSimulation } from '@/store/simulation'
  * shortcut: version string hardcoded here; inject from package.json at build time
  * when release automation needs a single source of truth.
  */
-const VERSION = 'v0.8.0'
+const VERSION = 'v0.9.0'
 
 /** Shared panel chrome: uppercase title bar + body. */
 export function Panel({

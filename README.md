@@ -43,7 +43,9 @@ Three things to know before deploying this anywhere public:
   `cc1plus.wasm` (~14 MB) into `dist/assets/` because the package's Emscripten glue imports it
   statically; the runtime uses `/avr/tools/` instead, so that copy is redundant.
 - **Libraries.** Only the libraries precompiled into that package are linkable (Servo, Wire,
-  SPI, Adafruit GFX/SSD1306/BMP085/BusIO, DHT, VL53L0X…). There is no Library Manager.
+  SPI, Adafruit GFX/SSD1306/BMP085/BusIO, DHT, VL53L0X…). There is no Library Manager. A part
+  declares the object group it needs (`sensors: ['OLED']`) and the compile step unions those
+  across the diagram; a library whose group nobody asked for will not link.
 
 `compileSketch()` runs in a Web Worker so the canvas never stutters; `compileSketchInline()`
 runs on the current thread and is what the headless tests use.
@@ -98,6 +100,39 @@ The button pulls `D2` to GND and the chip's **internal pull-up** holds it high w
 so `INPUT_PULLUP` works with no external resistor. `digitalRead` reads the *solved* net
 voltage — a real round trip through the circuit, one frame of latency.
 
+### `examples/oled-hello.json`
+
+A **128×64 OLED on the I2C bus** (SDA→A4, SCL→A5), driven by the **real `Adafruit_SSD1306`
+library** — not a stand-in. Import it, paste this, press Run:
+
+```cpp
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+Adafruit_SSD1306 display(128, 64, &Wire, -1);
+
+void setup() {
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(F("BLUEPRINT"));
+  display.display();
+}
+
+void loop() {}
+```
+
+`display.println` paints a simulated SSD1306's framebuffer, and the canvas draws the pixels —
+the 552 lit pixels of that text are what the chip was actually told to write.
+
+The toolchain only links a library when its object group is requested, so a part **declares**
+what it needs (`sensors: ['OLED']`) and the compile step unions those across the diagram.
+Without that declaration an `Adafruit_SSD1306` sketch fails to link — there is a test for
+exactly that, because it is easy to mistake for a code error.
+
 ## Status / roadmap
 
 | Phase | Scope                                  | Status |
@@ -110,7 +145,7 @@ voltage — a real round trip through the circuit, one frame of latency.
 | P4b   | Digital peripherals (displays, shift registers, keypads) | done   |
 | P4c   | Input devices (buttons, keypads, analog sensors) | done   |
 | P4d   | PWM averaging and a live pin voltmeter | done   |
-| P4e   | I²C/SPI displays (OLED, LCD)            | –      |
+| P4e   | I²C/SPI displays (OLED, LCD)            | done (OLED) |
 | P5    | Pico simulation                         | –      |
 
 ## Conventional Commits
