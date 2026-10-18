@@ -120,3 +120,22 @@ export function downloadDiagram(d: Diagram, filename = 'blueprint.diagram.json')
 export async function readDiagramFile(file: File): Promise<Diagram> {
   return parse(await file.text())
 }
+
+/** The sketch is a plain string, so it gets its own tiny key rather than a diagram envelope. */
+export const SKETCH_KEY = 'blueprint.sketch.v1'
+
+export function saveSketch(text: string): void {
+  try {
+    localStorage.setItem(SKETCH_KEY, text)
+  } catch {
+    // best effort; a full or blocked storage must not break editing
+  }
+}
+
+export function loadSketch(): string | null {
+  try {
+    return localStorage.getItem(SKETCH_KEY)
+  } catch {
+    return null
+  }
+}
