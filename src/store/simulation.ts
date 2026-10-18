@@ -3,10 +3,7 @@ import { create } from 'zustand'
 import { loadSketch, saveSketch } from '@/lib/persist'
 import type { PartRenderState } from '@/lib/types'
 
-/**
- * shortcut: the sketch lives in a textarea, not Monaco. Monaco needs bundler worker
- * config that cannot be verified in this environment; upgrade in P4.
- */
+/** The sketch the editor starts from: the pin-13 Blink every Arduino tutorial begins with. */
 export const DEFAULT_SKETCH = `// Blink — LED on pin 13, 500 ms on, 500 ms off
 void setup() {
   pinMode(13, OUTPUT);
