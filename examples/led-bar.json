@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "notes": [
+    {
+      "id": "note-title",
+      "at": { "x": 0, "y": -150 },
+      "text": "LED BAR GRAPH\n\nImport, then press Run.\n\nWorks with the default Blink sketch - no code needed. D13 clocks the 74HC595, DS is tied high, so every rising edge shifts in a 1 and latches it. One more LED lights each second until all eight are on.",
+      "color": "#fde68a"
+    },
+    {
+      "id": "note-595",
+      "at": { "x": 420, "y": 180 },
+      "text": "74HC595\nDS tied to 5V\nSHCP + STCP <- D13\nOE tied to GND\nMR tied to 5V",
+      "color": "#a7f3d0"
+    },
+    {
+      "id": "note-rule",
+      "at": { "x": 560, "y": 340 },
+      "text": "Each output drives a 220 ohm resistor into an LED. All cathodes return to the GND rail.",
+      "color": "#bfdbfe"
+    }
+  ],
+  "parts": [
+    { "id": "uno", "def": "arduino-uno", "at": { "x": 0, "y": 0 }, "label": "Blink on D13" },
+    { "id": "sr", "def": "shift-register-74hc595", "at": { "x": 420, "y": 40 } },
+    { "id": "vcc", "def": "rail-5v", "at": { "x": 330, "y": 60 } },
+    { "id": "gnd", "def": "rail-gnd", "at": { "x": 390, "y": 60 } },
+    { "id": "r0", "def": "resistor", "at": { "x": 600, "y": 10 }, "label": "220R" },
+    { "id": "l0", "def": "led", "at": { "x": 720, "y": 10 }, "label": "D0" },
+    { "id": "r1", "def": "resistor", "at": { "x": 600, "y": 54 }, "label": "220R" },
+    { "id": "l1", "def": "led", "at": { "x": 720, "y": 54 }, "label": "D1" },
+    { "id": "r2", "def": "resistor", "at": { "x": 600, "y": 98 }, "label": "220R" },
+    { "id": "l2", "def": "led", "at": { "x": 720, "y": 98 }, "label": "D2" },
+    { "id": "r3", "def": "resistor", "at": { "x": 600, "y": 142 }, "label": "220R" },
+    { "id": "l3", "def": "led", "at": { "x": 720, "y": 142 }, "label": "D3" },
+    { "id": "r4", "def": "resistor", "at": { "x": 600, "y": 186 }, "label": "220R" },
+    { "id": "l4", "def": "led", "at": { "x": 720, "y": 186 }, "label": "D4" },
+    { "id": "r5", "def": "resistor", "at": { "x": 600, "y": 230 }, "label": "220R" },
+    { "id": "l5", "def": "led", "at": { "x": 720, "y": 230 }, "label": "D5" },
+    { "id": "r6", "def": "resistor", "at": { "x": 600, "y": 274 }, "label": "220R" },
+    { "id": "l6", "def": "led", "at": { "x": 720, "y": 274 }, "label": "D6" },
+    { "id": "r7", "def": "resistor", "at": { "x": 600, "y": 318 }, "label": "220R" },
+    { "id": "l7", "def": "led", "at": { "x": 720, "y": 318 }, "label": "D7" }
+  ],
+  "wires": [
+    { "id": "w-ds", "from": { "part": "vcc", "pin": "5V" }, "to": { "part": "sr", "pin": "ds" }, "color": "#ef4444", "label": "DS = high" },
+    { "id": "w-mr", "from": { "part": "vcc", "pin": "5V" }, "to": { "part": "sr", "pin": "mr" }, "color": "#ef4444" },
+    { "id": "w-shcp", "from": { "part": "uno", "pin": "d13" }, "to": { "part": "sr", "pin": "shcp" }, "color": "#22c55e", "label": "SHCP" },
+    { "id": "w-stcp", "from": { "part": "uno", "pin": "d13" }, "to": { "part": "sr", "pin": "stcp" }, "color": "#22c55e", "label": "STCP" },
+    { "id": "w-oe", "from": { "part": "gnd", "pin": "GND" }, "to": { "part": "sr", "pin": "oe" }, "color": "#64748b", "label": "OE = enabled" },
+    { "id": "w-gnd-595", "from": { "part": "gnd", "pin": "GND" }, "to": { "part": "sr", "pin": "gnd" }, "color": "#64748b" },
+
+    { "id": "wq0", "from": { "part": "sr", "pin": "q0" }, "to": { "part": "r0", "pin": "1" }, "color": "#f59e0b" },
+    { "id": "wl0", "from": { "part": "r0", "pin": "2" }, "to": { "part": "l0", "pin": "a" } },
+    { "id": "wg0", "from": { "part": "l0", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" },
+    { "id": "wq1", "from": { "part": "sr", "pin": "q1" }, "to": { "part": "r1", "pin": "1" }, "color": "#f59e0b" },
+    { "id": "wl1", "from": { "part": "r1", "pin": "2" }, "to": { "part": "l1", "pin": "a" } },
+    { "id": "wg1", "from": { "part": "l1", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" },
+    { "id": "wq2", "from": { "part": "sr", "pin": "q2" }, "to": { "part": "r2", "pin": "1" }, "color": "#f59e0b" },
+    { "id": "wl2", "from": { "part": "r2", "pin": "2" }, "to": { "part": "l2", "pin": "a" } },
+    { "id": "wg2", "from": { "part": "l2", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" },
+    { "id": "wq3", "from": { "part": "sr", "pin": "q3" }, "to": { "part": "r3", "pin": "1" }, "color": "#f59e0b" },
+    { "id": "wl3", "from": { "part": "r3", "pin": "2" }, "to": { "part": "l3", "pin": "a" } },
+    { "id": "wg3", "from": { "part": "l3", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" },
+    { "id": "wq4", "from": { "part": "sr", "pin": "q4" }, "to": { "part": "r4", "pin": "1" }, "color": "#f59e0b" },
+    { "id": "wl4", "from": { "part": "r4", "pin": "2" }, "to": { "part": "l4", "pin": "a" } },
+    { "id": "wg4", "from": { "part": "l4", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" },
+    { "id": "wq5", "from": { "part": "sr", "pin": "q5" }, "to": { "part": "r5", "pin": "1" }, "color": "#f59e0b" },
+    { "id": "wl5", "from": { "part": "r5", "pin": "2" }, "to": { "part": "l5", "pin": "a" } },
+    { "id": "wg5", "from": { "part": "l5", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" },
+    { "id": "wq6", "from": { "part": "sr", "pin": "q6" }, "to": { "part": "r6", "pin": "1" }, "color": "#f59e0b" },
+    { "id": "wl6", "from": { "part": "r6", "pin": "2" }, "to": { "part": "l6", "pin": "a" } },
+    { "id": "wg6", "from": { "part": "l6", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" },
+    { "id": "wq7", "from": { "part": "sr", "pin": "q7" }, "to": { "part": "r7", "pin": "1" }, "color": "#f59e0b" },
+    { "id": "wl7", "from": { "part": "r7", "pin": "2" }, "to": { "part": "l7", "pin": "a" } },
+    { "id": "wg7", "from": { "part": "l7", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" }
+  ]
+}

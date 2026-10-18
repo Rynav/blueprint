@@ -48,6 +48,35 @@ Three things to know before deploying this anywhere public:
 `compileSketch()` runs in a Web Worker so the canvas never stutters; `compileSketchInline()`
 runs on the current thread and is what the headless tests use.
 
+## Examples
+
+`examples/led-bar.json` — an **8-LED bar graph driven by a 74HC595**. Import it with the
+inspector's Import button and press Run: it works with the **default Blink sketch, no code
+needed**. D13 clocks the shift register while its data pin is tied high, so every rising edge
+shifts in a 1 and latches it — one more LED lights each second until all eight are on.
+
+`bun run check:sample` loads the shipped file through the real importer and asserts it still
+does that, so the example cannot rot.
+
+To make it a proper chaser instead, change the wiring (DS→D11, SHCP→D13, STCP→D12) and paste:
+
+```cpp
+void setup() {
+  pinMode(11, OUTPUT);
+  pinMode(12, OUTPUT);
+  pinMode(13, OUTPUT);
+}
+
+void loop() {
+  for (int i = 0; i < 8; i++) {
+    digitalWrite(12, LOW);
+    shiftOut(11, 13, MSBFIRST, 1 << i);
+    digitalWrite(12, HIGH);
+    delay(120);
+  }
+}
+```
+
 ## Status / roadmap
 
 | Phase | Scope                                  | Status |
