@@ -1,6 +1,17 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.6.0] - 2026-10-18
+
+### Features
+- (**devices**) digital peripheral framework with 74HC595 and 7-segment
+- shortcut: devices are stepped in diagram order with no fixed-point iteration, so a two-device feedback loop settles a frame late. No per-pin resolution beyond 0/1/z. The 595's Q7S is not gated by OE. Only rail-5v and rail-gnd drive a net as a reference.
+- (**avr**) record pin transitions so bit-banged clocks survive a frame
+
+
+### Tests
+- (**devices**) digital suites plus a single-frame replay regression
+
 ## [0.5.0] - 2026-10-18
 
 ### Features

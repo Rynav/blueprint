@@ -57,7 +57,8 @@ runs on the current thread and is what the headless tests use.
 | P2    | SPICE core (analog simulation)          | done   |
 | P3    | Blink end-to-end (in-browser Arduino C++ compile) | done   |
 | P4a   | Analog devices, models and inspector params | done   |
-| P4b   | Digital peripherals (displays, shift registers, keypads) | – |
+| P4b   | Digital peripherals (displays, shift registers, keypads) | done   |
+| P4c   | Input devices (buttons, keypads, analog sensors) | –      |
 | P5    | Pico simulation                         | –      |
 
 ## Conventional Commits

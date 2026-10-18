@@ -40,6 +40,8 @@ export interface PartDef {
   defaultParams?: Record<string, number>
   /** Present when the part is a programmable MCU board. */
   mcu?: McuSpec
+  /** Present when the part is a digital peripheral (display, shift register, ...). */
+  device?: DeviceModel
   /** Draws the part in its local frame. Must not mutate anything. */
   render: (props: { part: PartInstance; def: PartDef; state?: PartRenderState }) => ReactNode
 }
@@ -48,6 +50,38 @@ export interface PartDef {
 export interface PartRenderState {
   /** LED brightness, 0..1. */
   brightness?: number
+  /** Lit indicators for segment displays, e.g. 7-segment 'a'..'g' and 'dp'. */
+  lit?: string[]
+  /** Free-form device state for richer visuals (a framebuffer, later). */
+  data?: Record<string, unknown>
+}
+
+/** What a digital device can see of the circuit when it is stepped. */
+export interface DeviceInput {
+  /** The level on the net this pin belongs to: 0, 1, or 'z' when nothing drives it. */
+  level: (pinId: string) => 0 | 1 | 'z'
+  /** Microseconds since the previous step. */
+  dtMicros: number
+}
+
+/**
+ * A digital peripheral: a state machine that reads the levels on its pins, keeps state
+ * between frames, and drives its own outputs. The MCU is not special here — a device's
+ * outputs are fed back into the same net solve that lights the LEDs.
+ */
+export interface DeviceModel {
+  /** Pin ids this device drives. Their levels are recomputed on every step. */
+  outputs: string[]
+  /**
+   * Advance one frame. `state` is this part instance's persistent bag; mutate it in
+   * place and return the levels to drive. Called after the MCU runs, before the solve.
+   */
+  step: (
+    input: DeviceInput,
+    state: Record<string, unknown>,
+  ) => Record<string, 0 | 1 | 'z'>
+  /** Derive render state from the device's own state, for the canvas. */
+  visual?: (state: Record<string, unknown>) => PartRenderState
 }
 
 /** How a board's broken-out pins map onto the emulated chip. */
