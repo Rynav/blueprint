@@ -190,6 +190,7 @@ const potentiometer: PartDef = {
     { id: '2', label: '2', x: 30, y: 50, kind: 'passive' },
     { id: '3', label: '3', x: 50, y: 50, kind: 'passive' },
   ],
+  defaultParams: { ohms: 10000, position: 0.5 },
   render: () => (
     <>
       <line x1={10} y1={40} x2={10} y2={50} stroke={LINE} strokeWidth={1.2} />

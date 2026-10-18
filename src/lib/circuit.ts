@@ -155,6 +155,106 @@ export function simulate(
         }
         break
       }
+      case 'diode': {
+        const a = netOf(part.id, 'a') // anode
+        const k = netOf(part.id, 'k') // cathode
+        if (a === undefined || k === undefined) break
+        const vf = params.vf ?? def.defaultParams?.vf ?? 0.7
+        // A signal diode is a stiffer junction than an LED: 5 mA knees at 0.7 V.
+        add({ kind: 'diode', a, b: k, ...diodeFromForwardVoltage(vf, 0.005, 1.8, 0.5) }, part.id)
+        break
+      }
+      case 'npn-transistor':
+      case 'pnp-transistor': {
+        const b = netOf(part.id, 'b')
+        const c = netOf(part.id, 'c')
+        const e = netOf(part.id, 'e')
+        if (b === undefined || c === undefined || e === undefined) break
+        add(
+          {
+            kind: 'bjt',
+            b,
+            c,
+            e,
+            npn: part.def === 'npn-transistor',
+            gain: params.gain ?? def.defaultParams?.gain ?? 100,
+          },
+          part.id,
+        )
+        break
+      }
+      case 'nmos':
+      case 'pmos': {
+        const g = netOf(part.id, 'g')
+        const d = netOf(part.id, 'd')
+        const s = netOf(part.id, 's')
+        if (g === undefined || d === undefined || s === undefined) break
+        add(
+          {
+            kind: 'mosfet',
+            g,
+            d,
+            s,
+            n: part.def === 'nmos',
+            vth: params.vth ?? def.defaultParams?.vth ?? 2.1,
+          },
+          part.id,
+        )
+        break
+      }
+      case 'dc-motor': {
+        const a = netOf(part.id, '+')
+        const b = netOf(part.id, '-')
+        if (a === undefined || b === undefined) break
+        // shortcut: a motor is modelled as its coil resistance alone — no inductance, so
+        // no back-EMF, inrush or speed-under-PWM; add a motor model when PWM averaging lands.
+        add({ kind: 'resistor', a, b, ohms: params.ohms ?? def.defaultParams?.ohms ?? 12 }, part.id)
+        break
+      }
+      case 'thermistor': {
+        const a = netOf(part.id, '1')
+        const b = netOf(part.id, '2')
+        if (a === undefined || b === undefined) break
+        const r25 = params.ohms ?? def.defaultParams?.ohms ?? 10000
+        const beta = params.beta ?? def.defaultParams?.beta ?? 3950
+        const tempC = params.temperatureC ?? def.defaultParams?.temperatureC ?? 25
+        // NTC beta equation: hotter -> lower resistance.
+        const ohms = r25 * Math.exp(beta * (1 / (tempC + 273.15) - 1 / 298.15))
+        add({ kind: 'resistor', a, b, ohms }, part.id)
+        break
+      }
+      case 'ldr': {
+        const a = netOf(part.id, '1')
+        const b = netOf(part.id, '2')
+        if (a === undefined || b === undefined) break
+        add({ kind: 'resistor', a, b, ohms: params.ohms ?? def.defaultParams?.ohms ?? 10000 }, part.id)
+        break
+      }
+      case 'potentiometer': {
+        const p1 = netOf(part.id, '1')
+        const p2 = netOf(part.id, '2') // wiper
+        const p3 = netOf(part.id, '3')
+        if (p1 === undefined || p2 === undefined || p3 === undefined) break
+        const ohms = params.ohms ?? def.defaultParams?.ohms ?? 10000
+        const pos = Math.min(1, Math.max(0, params.position ?? def.defaultParams?.position ?? 0.5))
+        // Two legs from the wiper; clamp off 0 Ω so the solve never goes singular.
+        add({ kind: 'resistor', a: p1, b: p2, ohms: Math.max(1e-3, ohms * pos) }, part.id)
+        add({ kind: 'resistor', a: p2, b: p3, ohms: Math.max(1e-3, ohms * (1 - pos)) }, part.id)
+        break
+      }
+      case 'rgb-led': {
+        const k = netOf(part.id, 'k')
+        if (k === undefined) break
+        const vf = params.vf ?? def.defaultParams?.vf ?? 2.0
+        // Each colour is its own diode to the shared cathode. Owner keys are per-colour so
+        // `current[partId:ch]` reads one channel rather than the sum of all three.
+        for (const ch of ['r', 'g', 'b'] as const) {
+          const a = netOf(part.id, ch)
+          if (a === undefined) continue
+          add({ kind: 'diode', a, b: k, ...diodeFromForwardVoltage(vf, 0.02, 1.8, 15) }, `${part.id}:${ch}`)
+        }
+        break
+      }
     }
   }
 
@@ -213,5 +313,8 @@ export function simulate(
 }
 
 // shortcut: P3 mapping limits — no capacitors/inductors, no PWM averaging (a pin is a hard
-// 5 V or 0 V per solve), button state comes from params.pressed not UI interaction, no
-// MOSFET/BJT. Upgrade when those parts are drawn or when PWM duty needs averaging.
+// 5 V or 0 V per solve), button state comes from params.pressed not UI interaction.
+// Upgrade when those parts are drawn or when PWM duty needs averaging.
+// shortcut: no transistor body diode (a BJT/MOSFET blocks one way and conducts the other
+// through the channel only) and no temperature-dependent LED/diode Vf. Add both when a
+// circuit depends on them (e.g. a flyback across a motor or a thermal sweep of a diode).
