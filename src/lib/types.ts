@@ -58,6 +58,8 @@ export interface PartRenderState {
   brightness?: number
   /** Lit indicators for segment displays, e.g. 7-segment 'a'..'g' and 'dp'. */
   lit?: string[]
+  /** Servo horn angle in degrees, 0..180. */
+  angle?: number
   /** Free-form device state for richer visuals (a framebuffer, later). */
   data?: Record<string, unknown>
 }

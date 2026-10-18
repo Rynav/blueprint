@@ -175,6 +175,20 @@ export function simulate(
         }
         break
       }
+      case 'keypad-4x4': {
+        // A 4x4 matrix: each key shorts one row to one column, and nothing else. Key `n` is
+        // row n/4+1, column n%4+1; every key is its own switch so an unwired key stays open.
+        // shortcut: a real keypad has contact resistance and lets a third simultaneous key
+        // ghost across the other two; only the single selected key is modelled. Upgrade when
+        // multi-key chords or analog (resistor-ladder) keypads are needed.
+        for (let index = 0; index < 16; index++) {
+          const row = netOf(part.id, `r${Math.floor(index / 4) + 1}`)
+          const col = netOf(part.id, `c${(index % 4) + 1}`)
+          if (row === undefined || col === undefined) continue
+          add({ kind: 'switch', a: row, b: col, closed: (params.key ?? -1) === index }, part.id)
+        }
+        break
+      }
       case 'diode': {
         const a = netOf(part.id, 'a') // anode
         const k = netOf(part.id, 'k') // cathode

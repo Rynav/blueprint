@@ -5,7 +5,9 @@ import { breadboardParts } from './breadboard'
 import { deviceParts } from './devices'
 import { digitalParts } from './digital'
 import { displayParts } from './display'
+import { keypad } from './keypad'
 import { powerParts } from './power'
+import { servoPart } from './servo'
 
 export interface PartCategory {
   id: string
@@ -34,6 +36,8 @@ const PARTS: PartDef[] = [
   ...powerParts,
   ...basicParts,
   ...deviceParts,
+  servoPart,
+  keypad,
   ...digitalParts,
   ...displayParts,
 ]
