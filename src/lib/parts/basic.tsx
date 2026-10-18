@@ -11,17 +11,26 @@ const led: PartDef = {
     { id: 'a', label: 'A', x: 10, y: 30, kind: 'passive' },
     { id: 'k', label: 'K', x: 10, y: 0, kind: 'passive' },
   ],
-  render: () => (
-    <>
-      <circle cx={10} cy={15} r={13} fill={ACCENT} opacity={0.1} />
-      <line x1={10} y1={0} x2={10} y2={10} stroke={LINE} strokeWidth={1.2} />
-      <line x1={10} y1={20} x2={10} y2={30} stroke={LINE} strokeWidth={1.2} />
-      <polygon points="10,10 4,20 16,20" fill={BODY_DARK} stroke={LINE} strokeWidth={1.2} />
-      <line x1={4} y1={10} x2={16} y2={10} stroke={LINE} strokeWidth={1.5} />
-      <Pad x={10} y={30} />
-      <Pad x={10} y={0} />
-    </>
-  ),
+  defaultParams: { vf: 2.0 },
+  render: ({ state }) => {
+    const lit = Math.min(1, Math.max(0, state?.brightness ?? 0))
+    return (
+      <>
+        <circle cx={10} cy={15} r={13 + 3 * lit} fill="#ef4444" opacity={0.12 + 0.45 * lit} />
+        <line x1={10} y1={0} x2={10} y2={10} stroke={LINE} strokeWidth={1.2} />
+        <line x1={10} y1={20} x2={10} y2={30} stroke={LINE} strokeWidth={1.2} />
+        <polygon
+          points="10,10 4,20 16,20"
+          fill={lit > 0.05 ? '#f87171' : BODY_DARK}
+          stroke={LINE}
+          strokeWidth={1.2}
+        />
+        <line x1={4} y1={10} x2={16} y2={10} stroke={LINE} strokeWidth={1.5} />
+        <Pad x={10} y={30} />
+        <Pad x={10} y={0} />
+      </>
+    )
+  },
 }
 
 const rgbLeads: [string, number][] = [
@@ -71,6 +80,7 @@ const resistor: PartDef = {
     { id: '1', label: '1', x: 0, y: 8, kind: 'passive' },
     { id: '2', label: '2', x: 50, y: 8, kind: 'passive' },
   ],
+  defaultParams: { ohms: 220 },
   render: () => (
     <>
       <line x1={0} y1={8} x2={13} y2={8} stroke={LINE} strokeWidth={1.2} />

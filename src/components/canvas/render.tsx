@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 
 import { GRID, type Viewport } from '@/lib/geometry'
-import type { Note, PartDef, PartInstance, Vec } from '@/lib/types'
+import type { Note, PartDef, PartInstance, PartRenderState, Vec } from '@/lib/types'
 
 export const PIN_R = 2.5
 export const PIN_HIT_R = 7
@@ -103,17 +103,19 @@ export function PartNode({
   part,
   def,
   hoveredPin,
+  state,
 }: {
   part: PartInstance
   def: PartDef
   hoveredPin: string | null
+  state?: PartRenderState
 }) {
   return (
     <g
       data-part-id={part.id}
       transform={`translate(${part.at.x} ${part.at.y}) rotate(${part.rotation} ${def.width / 2} ${def.height / 2})`}
     >
-      {def.render({ part, def })}
+      {def.render({ part, def, state })}
       {def.pins.map((pin) => (
         <g key={pin.id}>
           <circle

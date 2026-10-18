@@ -27,6 +27,7 @@ import {
 import { allPartDefs } from '@/lib/parts'
 import type { Endpoint, Vec, Wire } from '@/lib/types'
 import { useDiagram } from '@/store/diagram'
+import { useSimulation } from '@/store/simulation'
 
 const ACCENT = '#22d3ee'
 const CLICK_SLOP = 4
@@ -47,6 +48,9 @@ export function Canvas() {
   const selection = useDiagram((s) => s.selection)
   const viewport = useDiagram((s) => s.viewport)
   const wiring = useDiagram((s) => s.wiring)
+  // Brightness changes every frame while running, so this re-renders the whole scene.
+  // shortcut: no culling or memoisation yet; add per-part memo if a full breadboard gets janky.
+  const brightness = useSimulation((s) => s.brightness)
 
   const defs = useMemo(() => new Map(allPartDefs().map((d) => [d.id, d])), [])
   const selected = useMemo(() => new Set(selection), [selection])
@@ -423,6 +427,7 @@ export function Canvas() {
                 part={part}
                 def={def}
                 hoveredPin={hoverPin?.part === part.id ? hoverPin.pin : null}
+                state={{ brightness: brightness[part.id] }}
               />
             ) : (
               <PlaceholderPart key={part.id} part={part} />
