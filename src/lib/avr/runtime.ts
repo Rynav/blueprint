@@ -1,9 +1,13 @@
 import {
+  ADCMuxInputType,
+  AVRADC,
   AVRIOPort,
   AVRUSART,
   AVRTimer,
   CPU,
   PinState,
+  adcConfig,
+  atmega328Channels,
   avrInstruction,
   portBConfig,
   portCConfig,
@@ -34,6 +38,12 @@ export interface AvrRuntime {
   /** Clear the serial buffer. */
   clearSerial(): void
   reset(): void
+  /** The logic level an input pin should see. Ignored when the MCU drives that pin. */
+  setInputPin(pinId: string, level: 0 | 1): void
+  /** Volts (0..5) on an analog-capable pin, e.g. 'a0'. Ignored for non-ADC pins. */
+  setAnalogPin(pinId: string, volts: number): void
+  /** Pins with an active internal pull-up right now: DDR bit clear and PORT bit set. */
+  pullUps(): string[]
   /** Simulated microseconds elapsed since the last reset. */
   elapsedMicros(): number
 }
@@ -50,6 +60,24 @@ type PortName = 'B' | 'C' | 'D'
 interface Machine {
   cpu: CPU
   ports: Record<PortName, AVRIOPort>
+  adc: AVRADC
+}
+
+/** A board pin resolved once from the mcu spec: port bit, plus its ADC channel if it has one. */
+interface BoardPin {
+  key: string
+  pinId: string
+  port: PortName
+  bit: number
+  /** ADC mux channel (atmega328: port C bits 0..7), or undefined when the pin has no ADC input. */
+  channel?: number
+}
+
+/** ADC channel feeding a chip pin, or undefined when the pin is not an analog input. */
+function adcChannel(port: PortName, bit: number): number | undefined {
+  if (port !== 'C') return undefined
+  const mux = atmega328Channels[bit]
+  return mux?.type === ADCMuxInputType.SingleEnded ? bit : undefined
 }
 
 /** Intel HEX -> AVR program memory (little-endian 16-bit words). */
@@ -87,7 +115,9 @@ function buildMachine(prog: Uint16Array, clockHz: number, onByte: (value: number
   new AVRTimer(cpu, timer2Config) // analogWrite on 3/11
   const usart = new AVRUSART(cpu, usart0Config, clockHz)
   usart.onByteTransmit = onByte
-  return { cpu, ports }
+  const adc = new AVRADC(cpu, adcConfig)
+  adc.avcc = 5 // analogRead scales against 5 V; channelValues carry volts, not counts
+  return { cpu, ports, adc }
 }
 
 export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime {
@@ -96,11 +126,14 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
 
   const clockHz = mcu.clockHz
   // Pin table resolved once. The per-frame path only reads a pinState and sets a Map entry.
-  const pins = Object.entries(mcu.pins).map(([pinId, p]) => ({
+  const pins: BoardPin[] = Object.entries(mcu.pins).map(([pinId, p]) => ({
     key: `${board.id}:${pinId}`,
+    pinId,
     port: p.port,
     bit: p.bit,
+    channel: adcChannel(p.port, p.bit),
   }))
+  const pinById = new Map(pins.map((p) => [p.pinId, p]))
   // Port bit -> board pin key, so a port write can be turned into per-bit transitions.
   const portBits: Record<PortName, Map<number, string>> = { B: new Map(), C: new Map(), D: new Map() }
   for (const pin of pins) portBits[pin.port].set(pin.bit, pin.key)
@@ -142,16 +175,44 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
   const onByte = (value: number) => {
     serial += String.fromCharCode(value)
   }
+  // Requested input levels/analog volts, kept across load/reset so a rebuilt machine can be
+  // restored in one pass (a rebuild starts from a fresh, floating ADC/port).
+  const inputLevels = new Map<string, 0 | 1>()
+  const analogVolts = new Map<string, number>()
+
   let machine = buildMachine(prog, clockHz, onByte)
   attachListeners(machine)
+
+  /** Drive a pin's input level, unless the MCU drives it (DDR bit set). */
+  const applyInput = (pin: BoardPin, level: 0 | 1) => {
+    const port = machine.ports[pin.port]
+    // No-op when the pin is an output: the MCU's own drive overrides setPin anyway, and
+    // skipping it is what stops the feedback loop from fighting that drive.
+    if (machine.cpu.data[port.portConfig.DDR] & (1 << pin.bit)) return
+    port.setPin(pin.bit, level === 1)
+  }
+  const applyStored = () => {
+    for (const [pinId, level] of inputLevels) {
+      const pin = pinById.get(pinId)
+      if (pin) applyInput(pin, level)
+    }
+    for (const [pinId, volts] of analogVolts) {
+      const pin = pinById.get(pinId)
+      if (pin?.channel !== undefined) machine.adc.channelValues[pin.channel] = volts
+    }
+  }
+  const rebuild = () => {
+    machine = buildMachine(prog, clockHz, onByte)
+    attachListeners(machine)
+    applyStored()
+  }
 
   return {
     load(hex) {
       prog = parseIntelHex(hex)
       serial = ''
       transitions.length = 0
-      machine = buildMachine(prog, clockHz, onByte)
-      attachListeners(machine)
+      rebuild()
     },
 
     runFor(micros) {
@@ -187,16 +248,41 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
     clearSerial() {
       serial = ''
     },
+    setInputPin(pinId, level) {
+      const pin = pinById.get(pinId)
+      if (!pin) return
+      inputLevels.set(pinId, level)
+      applyInput(pin, level)
+    },
+    setAnalogPin(pinId, volts) {
+      const pin = pinById.get(pinId)
+      // shortcut: volts are written straight to the ADC channel - the sample-and-hold and the
+      // source impedance at the pin are not modelled. Upgrade if a high-impedance node must
+      // read differently from a stiff one.
+      if (pin?.channel === undefined || !Number.isFinite(volts)) return
+      const clamped = Math.min(5, Math.max(0, volts))
+      analogVolts.set(pinId, clamped)
+      machine.adc.channelValues[pin.channel] = clamped
+    },
+    pullUps() {
+      const keys: string[] = []
+      for (const pin of pins) {
+        const port = machine.ports[pin.port]
+        const mask = 1 << pin.bit
+        const ddr = machine.cpu.data[port.portConfig.DDR]
+        const value = machine.cpu.data[port.portConfig.PORT]
+        if (!(ddr & mask) && value & mask) keys.push(pin.key)
+      }
+      return keys
+    },
     reset() {
       serial = ''
       transitions.length = 0
-      machine = buildMachine(prog, clockHz, onByte)
-      attachListeners(machine)
+      rebuild()
     },
     elapsedMicros: () => (machine.cpu.cycles / clockHz) * 1e6,
   }
 }
 
-// shortcut: atmega328p only, no ADC input yet, no EEPROM persistence, and no external
-// interrupts driven by wired pins (P4/P5). Upgrade when analog reads or cross-part
-// interrupt simulation is needed.
+// shortcut: atmega328p only, no EEPROM persistence, and no external interrupts driven by
+// wired pins (P4/P5). Upgrade when cross-part interrupt simulation is needed.
