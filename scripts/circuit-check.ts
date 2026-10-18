@@ -180,6 +180,21 @@ ok('pot wiper at position 0.5 sits at ~2.5 V', Math.abs(wiperVolts(potDiagram(0.
 ok('pot wiper at position 0 sits at ~5 V', Math.abs(wiperVolts(potDiagram(0)) - 5) <= 0.2)
 ok('pot wiper at position 1 sits at ~0 V', Math.abs(wiperVolts(potDiagram(1)) - 0) <= 0.2)
 
+// ---- slide switch (SPDT): common is pin 2, thrown to pin 1 below mid-travel,
+// to pin 3 above it. 5 V on pin 1, GND on pin 3, so the common reads 5 V or 0 V.
+const slideDiagram = (position: number) =>
+  diagram(
+    [part('vcc', 'rail-5v'), part('gnd', 'rail-gnd'), partP('s1', 'slide-switch', { position })],
+    [
+      wire('w1', { part: 'vcc', pin: '5V' }, { part: 's1', pin: '1' }),
+      wire('w2', { part: 's1', pin: '3' }, { part: 'gnd', pin: 'GND' }),
+    ],
+  )
+const commonVolts = (d: Diagram) =>
+  simulate(d, defs, pinValues()).volts[buildNets(d, defs).netOf('s1', '2')!]
+ok('slide switch at position 0 throws the common to pin 1 (~5 V)', Math.abs(commonVolts(slideDiagram(0)) - 5) <= 0.2)
+ok('slide switch at position 1 throws the common to pin 3 (~0 V)', Math.abs(commonVolts(slideDiagram(1)) - 0) <= 0.2)
+
 // ---- thermistor: 10k top / NTC bottom divider ----
 // 25 C: R = 10k -> mid = 2.5 V. 40 C: R = 10k*exp(3950*(1/313.15 - 1/298.15)) ~= 5.3k
 // -> mid ~= 1.73 V: a hot NTC has less resistance, so the mid voltage drops.

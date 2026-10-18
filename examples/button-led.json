@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "notes": [
+    {
+      "id": "note-title",
+      "at": { "x": 0, "y": -140 },
+      "text": "BUTTON CONTROLS LED\n\nPaste the sketch from the README, then press Run and click the button in the Inspector.\n\nThe button pulls D2 to GND, so it uses the chip's internal pull-up (INPUT_PULLUP). digitalRead(D2) comes back through the solved circuit - this is a real round trip, not a visual.",
+      "color": "#fde68a"
+    },
+    {
+      "id": "note-btn",
+      "at": { "x": 300, "y": 140 },
+      "text": "Push Button\n1a / 1b -> D2\n2a / 2b -> GND rail\n\nPress it with the Inspector's \"Pressed\" parameter.",
+      "color": "#a7f3d0"
+    }
+  ],
+  "parts": [
+    { "id": "uno", "def": "arduino-uno", "at": { "x": 0, "y": 0 }, "label": "D2 button, D13 LED" },
+    { "id": "btn", "def": "pushbutton", "at": { "x": 330, "y": 40 }, "rotation": 0, "params": { "pressed": 0 } },
+    { "id": "gnd", "def": "rail-gnd", "at": { "x": 330, "y": 220 } },
+    { "id": "r1", "def": "resistor", "at": { "x": 130, "y": 250 }, "label": "220R" },
+    { "id": "l1", "def": "led", "at": { "x": 240, "y": 250 }, "label": "D13" }
+  ],
+  "wires": [
+    { "id": "w-btn-a", "from": { "part": "uno", "pin": "d2" }, "to": { "part": "btn", "pin": "1a" }, "color": "#22c55e", "label": "D2" },
+    { "id": "w-btn-b", "from": { "part": "btn", "pin": "2a" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" },
+    { "id": "w-led-a", "from": { "part": "uno", "pin": "d13" }, "to": { "part": "r1", "pin": "1" }, "color": "#22c55e", "label": "D13" },
+    { "id": "w-led-b", "from": { "part": "r1", "pin": "2" }, "to": { "part": "l1", "pin": "a" } },
+    { "id": "w-led-c", "from": { "part": "l1", "pin": "k" }, "to": { "part": "gnd", "pin": "GND" }, "color": "#64748b" }
+  ]
+}
