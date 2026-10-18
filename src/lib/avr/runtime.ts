@@ -21,6 +21,13 @@ import type { PartDef, PartInstance } from '@/lib/types'
 
 export type PinValue = 0 | 1 | 'z'
 
+/** One recorded board-pin edge: the bit's new value and the CPU cycle at which it changed. */
+export interface PinTransition {
+  key: string
+  value: PinValue
+  cycles: number
+}
+
 export interface AvrRuntime {
   /** Load Intel HEX (or the raw words). Safe to call repeatedly. */
   load(hex: string): void
@@ -30,9 +37,17 @@ export interface AvrRuntime {
   pinValues(): Map<string, PinValue>
   /**
    * Every board-pin transition recorded since the last drain, in the order it happened:
-   * `{ key, value }` per changed bit, `'z'` when a pin goes back to input. Returns and clears.
+   * `{ key, value, cycles }` per changed bit, `'z'` when a pin goes back to input. Returns and clears.
    */
-  drainTransitions(): Array<{ key: string; value: PinValue }>
+  drainTransitions(): PinTransition[]
+  /**
+   * Fraction of the last frame each board pin spent high, keyed `${partId}:${pinId}` for
+   * every pin in the board's `mcu.pins`. The window is the one closed by the most recent
+   * `drainTransitions()` (or, before any drain, since load/reset); the two calls describe the
+   * same window whichever order they are made in. A pin that never changed reads 1 when high,
+   * 0 when low or `'z'`. This is how `analogWrite`'s duty reaches the analog solve.
+   */
+  pinDuty(): Map<string, number>
   /** Everything written to the USART so far, decoded as text. */
   serial(): string
   /** Clear the serial buffer. */
@@ -142,12 +157,13 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
    * Board-pin transitions since the last drain. A bit-banged clock pulse can be a few CPU
    * cycles wide, far narrower than a frame, so the caller replays these instead of sampling.
    */
-  const transitions: Array<{ key: string; value: PinValue }> = []
-  const record = (key: string, value: PinValue) => {
-    transitions.push({ key, value })
+  const transitions: PinTransition[] = []
+  const record = (key: string, value: PinValue, cycles: number) => {
+    transitions.push({ key, value, cycles })
     // shortcut: buffer is capped (drops the oldest half when full), so a sketch that toggles a
-    // pin more than ~4k times within one frame loses its earliest edges. Upgrade to a true
-    // ring buffer if a design ever needs every edge of a pathological bit-bang.
+    // pin more than ~4k times within one frame loses its earliest edges - and the complementing
+    // duty measurement, whose base value was taken at window start, drifts with them. Upgrade to
+    // a true ring buffer if a design ever needs every edge of a pathological bit-bang.
     if (transitions.length >= MAX_TRANSITIONS) transitions.splice(0, MAX_TRANSITIONS >> 1)
   }
   const attachListeners = (m: Machine) => {
@@ -163,7 +179,7 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
           const value: PinValue = state === PinState.High ? 1 : state === PinState.Low ? 0 : 'z'
           if (last.get(bit) !== value) {
             last.set(bit, value)
-            record(key, value)
+            record(key, value, m.cpu.cycles)
           }
         }
       })
@@ -207,12 +223,66 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
     applyStored()
   }
 
+  /** Every board pin's level right now. */
+  const readValues = (): Map<string, PinValue> => {
+    const values = new Map<string, PinValue>()
+    for (const pin of pins) {
+      const state = machine.ports[pin.port].pinState(pin.bit)
+      values.set(pin.key, state === PinState.High ? 1 : state === PinState.Low ? 0 : 'z')
+    }
+    return values
+  }
+
+  // Duty window. `winStart` is the cycle the open window began; `base` is each pin's level at
+  // that cycle, needed because only edges are recorded. `pendingDuty` holds the window the most
+  // recent drain closed until pinDuty() reports it (same frame, same cycle count).
+  let winStart = 0
+  let base = readValues()
+  let pendingDuty: { end: number; duty: Map<string, number> } | null = null
+  const resetDutyWindow = () => {
+    winStart = machine.cpu.cycles
+    base = readValues()
+    pendingDuty = null
+  }
+
+  /**
+   * Fraction of [start, end] each board pin spent high, from the recorded edges. A pin with no
+   * edge keeps its base level: 1 if high, 0 if low. `'z'` (the pin is an input / high impedance,
+   * so it drives nothing) never counts as high and reads 0, exactly like a driven low.
+   */
+  const windowDuty = (start: number, end: number, edges: PinTransition[]): Map<string, number> => {
+    const cur = new Map(base)
+    const last = new Map<string, number>()
+    const high = new Map<string, number>()
+    for (const pin of pins) {
+      last.set(pin.key, start)
+      high.set(pin.key, 0)
+    }
+    for (const e of edges) {
+      if (!cur.has(e.key)) continue // not a board pin
+      if (cur.get(e.key) === 1) {
+        high.set(e.key, high.get(e.key)! + Math.max(0, e.cycles - last.get(e.key)!))
+      }
+      cur.set(e.key, e.value)
+      last.set(e.key, e.cycles)
+    }
+    const span = end - start
+    const duty = new Map<string, number>()
+    for (const pin of pins) {
+      let h = high.get(pin.key)!
+      if (cur.get(pin.key) === 1) h += Math.max(0, end - last.get(pin.key)!)
+      duty.set(pin.key, span > 0 ? h / span : cur.get(pin.key) === 1 ? 1 : 0)
+    }
+    return duty
+  }
+
   return {
     load(hex) {
       prog = parseIntelHex(hex)
       serial = ''
       transitions.length = 0
       rebuild()
+      resetDutyWindow()
     },
 
     runFor(micros) {
@@ -228,20 +298,27 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
       }
     },
 
-    pinValues() {
-      const values = new Map<string, PinValue>()
-      for (const pin of pins) {
-        const state = machine.ports[pin.port].pinState(pin.bit)
-        const value: PinValue = state === PinState.High ? 1 : state === PinState.Low ? 0 : 'z'
-        values.set(pin.key, value)
-      }
-      return values
-    },
+    pinValues: readValues,
 
     drainTransitions() {
       const drained = transitions.slice()
       transitions.length = 0
+      const end = machine.cpu.cycles
+      pendingDuty = { end, duty: windowDuty(winStart, end, drained) }
+      winStart = end
+      base = readValues()
       return drained
+    },
+
+    pinDuty() {
+      // The drain that just closed this frame's window is reported once; if CPU time advanced
+      // since, the window has moved on, so compute the open one instead.
+      if (pendingDuty && pendingDuty.end === machine.cpu.cycles) {
+        const duty = pendingDuty.duty
+        pendingDuty = null
+        return duty
+      }
+      return windowDuty(winStart, machine.cpu.cycles, transitions)
     },
 
     serial: () => serial,
@@ -279,6 +356,7 @@ export function createAvrRuntime(board: PartInstance, def: PartDef): AvrRuntime 
       serial = ''
       transitions.length = 0
       rebuild()
+      resetDutyWindow()
     },
     elapsedMicros: () => (machine.cpu.cycles / clockHz) * 1e6,
   }

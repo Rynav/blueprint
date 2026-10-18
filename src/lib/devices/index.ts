@@ -63,6 +63,8 @@ export function createDeviceHarness(
   diagram: Diagram,
   defs: Map<string, PartDef>,
   state: DeviceRuntimeState = new Map(),
+  /** `${partId}:${pinId}` -> fraction of the last frame that pin spent high (from `pinDuty`). */
+  duty: Map<string, number> = new Map(),
 ): DeviceHarness {
   let netOf: ((partId: string, pinId: string) => string | undefined) | null = null
   const netPins = new Map<string, Endpoint[]>()
@@ -107,6 +109,17 @@ export function createDeviceHarness(
     devices.length = 0
   }
 
+  // Per-net duty, resolved from the caller's `${partId}:${pinId}` map exactly as levels are. A
+  // pin with no duty entry falls back to its settled level (high -> 1, low or 'z' -> 0).
+  const netDuty = new Map<string, number>()
+  if (netOf) {
+    for (const [key, value] of duty) {
+      const kp = splitKey(key)
+      const net = kp ? netOf(kp[0], kp[1]) : undefined
+      if (net !== undefined && Number.isFinite(value)) netDuty.set(net, value)
+    }
+  }
+
   // Live net levels while edges are replayed. Reset to rails+MCU on every settle.
   const netLevel = new Map<string, PinValue>()
   const seedNetLevel = (mcuPinValues: Map<string, PinValue>) => {
@@ -133,6 +146,12 @@ export function createDeviceHarness(
           level: (pinId) => {
             const net = netOf?.(part.id, pinId)
             return (net !== undefined ? netLevel.get(net) : undefined) ?? 'z'
+          },
+          duty: (pinId) => {
+            const net = netOf?.(part.id, pinId)
+            const d = net !== undefined ? netDuty.get(net) : undefined
+            if (d !== undefined) return d
+            return (net !== undefined ? netLevel.get(net) : undefined) === 1 ? 1 : 0
           },
           dtMicros,
         },
@@ -188,6 +207,8 @@ export function stepDevices(
   mcuPinValues: Map<string, PinValue>,
   state: DeviceRuntimeState,
   dtMicros: number,
+  /** Optional `${partId}:${pinId}` -> duty, same shape as `createDeviceHarness`'s. */
+  duty?: Map<string, number>,
 ): Map<string, PinValue> {
-  return createDeviceHarness(diagram, defs, state).settle(mcuPinValues, dtMicros)
+  return createDeviceHarness(diagram, defs, state, duty).settle(mcuPinValues, dtMicros)
 }

@@ -60,6 +60,12 @@ export interface PartRenderState {
 export interface DeviceInput {
   /** The level on the net this pin belongs to: 0, 1, or 'z' when nothing drives it. */
   level: (pinId: string) => 0 | 1 | 'z'
+  /**
+   * Duty cycle seen on this pin over the last frame, 0..1. A pin held high reads 1, one
+   * held low reads 0, and `analogWrite` reads the fraction of the frame it spent high.
+   * This is how a device senses PWM (a servo measuring pulse width, a motor controller).
+   */
+  duty: (pinId: string) => number
   /** Microseconds since the previous step. */
   dtMicros: number
 }

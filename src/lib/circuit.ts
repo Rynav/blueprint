@@ -86,7 +86,7 @@ export function simulate(
   diagram: Diagram,
   defs: Map<string, PartDef>,
   pinValues: Map<string, 0 | 1 | 'z'>,
-  options?: { gminOhms?: number; pullUps?: Set<string> },
+  options?: { gminOhms?: number; pullUps?: Set<string>; duty?: Map<string, number> },
 ): CircuitState {
   const gmin = options?.gminOhms ?? GMIN_OHMS
   const nets = buildNets(diagram, defs)
@@ -280,6 +280,12 @@ export function simulate(
 
   // MCU pins: a driven pin is a Thevenin source, an ideal source in series with PIN_OHMS,
   // from the pin's net to ground. 'z' contributes nothing (high impedance, LED stays dark).
+  // A pin with a duty entry is driven at its *average* voltage, duty * PIN_HIGH_VOLTS, so an
+  // `analogWrite` pin dims an LED instead of flickering it full on / full off between frames.
+  // shortcut: this is a DC equivalent - right for an LED's apparent brightness, wrong for
+  // anything that senses the switching itself (an RC filter's ripple, a speaker, motor
+  // back-EMF/speed under PWM). Upgrade to a time-domain or multi-phase solve when those land.
+  const duty = options?.duty
   let pinCounter = 0
   for (const [key, value] of pinValues) {
     if (value !== 0 && value !== 1) continue
@@ -295,8 +301,11 @@ export function simulate(
     if (!def.pins.some((pin) => pin.id === pinId)) continue
     const net = netOf(partId, pinId)
     if (net === undefined) continue
+    const d = duty?.get(key)
+    const volts =
+      d !== undefined && Number.isFinite(d) ? d * PIN_HIGH_VOLTS : value === 1 ? PIN_HIGH_VOLTS : 0
     const mid = `#pin${pinCounter++}` // may not collide with a real net id (n0, n1, ...)
-    add({ kind: 'voltage', a: mid, b: ground, volts: value === 1 ? PIN_HIGH_VOLTS : 0 }, null)
+    add({ kind: 'voltage', a: mid, b: ground, volts }, null)
     add({ kind: 'resistor', a: mid, b: net, ohms: PIN_OHMS }, partId)
   }
 
@@ -353,9 +362,9 @@ export function simulate(
     : { converged: false, volts, brightness, current, reason: result.reason ?? 'circuit did not converge' }
 }
 
-// shortcut: P3 mapping limits — no capacitors/inductors, no PWM averaging (a pin is a hard
-// 5 V or 0 V per solve), button state comes from params.pressed not UI interaction.
-// Upgrade when those parts are drawn or when PWM duty needs averaging.
+// shortcut: P3 mapping limits — no capacitors/inductors, and a PWM'd pin is averaged to a DC
+// level (see the duty note above). Button state comes from params.pressed, not UI interaction.
+// Upgrade when those parts are drawn or when a design needs the switching itself.
 // shortcut: no transistor body diode (a BJT/MOSFET blocks one way and conducts the other
 // through the channel only) and no temperature-dependent LED/diode Vf. Add both when a
 // circuit depends on them (e.g. a flyback across a motor or a thermal sweep of a diode).
