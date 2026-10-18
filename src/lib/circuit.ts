@@ -276,6 +276,34 @@ export function simulate(
         add({ kind: 'resistor', a: p2, b: p3, ohms: Math.max(1e-3, ohms * (1 - pos)) }, part.id)
         break
       }
+      case 'joystick': {
+        // Two pots sharing the module's VCC/GND: each axis is the potentiometer's two-leg
+        // split, VCC -[pos]- wiper -[1-pos]- GND. pos 0 -> wiper at VCC, pos 1 -> at GND.
+        // The stick's switch shorts its own SW pin to the module ground (KY-023 wiring).
+        const vcc = netOf(part.id, 'vcc')
+        const gnd = netOf(part.id, 'gnd')
+        if (vcc !== undefined && gnd !== undefined) {
+          const ohms = params.ohms ?? def.defaultParams?.ohms ?? 10000
+          const axis = (pin: string, pos: number) => {
+            const wiper = netOf(part.id, pin)
+            if (wiper === undefined) return // dangling wiper: skipped like every other case
+            const p = Math.min(1, Math.max(0, pos))
+            // Clamp off 0 Ω so the solve never goes singular, exactly as the pot does.
+            add({ kind: 'resistor', a: vcc, b: wiper, ohms: Math.max(1e-3, ohms * p) }, part.id)
+            add({ kind: 'resistor', a: wiper, b: gnd, ohms: Math.max(1e-3, ohms * (1 - p)) }, part.id)
+          }
+          axis('vrx', params.x ?? def.defaultParams?.x ?? 0.5)
+          axis('vry', params.y ?? def.defaultParams?.y ?? 0.5)
+        }
+        const sw = netOf(part.id, 'sw')
+        if (sw !== undefined && gnd !== undefined) {
+          // shortcut: the switch's far side is the module's own ground (KY-023 wiring), so a
+          // stick whose switch returns somewhere else would need a second pin; add one when it
+          // shows up.
+          add({ kind: 'switch', a: sw, b: gnd, closed: (params.pressed ?? 0) === 1 }, part.id)
+        }
+        break
+      }
       case 'rgb-led': {
         const k = netOf(part.id, 'k')
         if (k === undefined) break
