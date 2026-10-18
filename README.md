@@ -77,6 +77,27 @@ void loop() {
 }
 ```
 
+### `examples/button-led.json`
+
+A **button that actually controls an LED** — the sketch reads the circuit. Import it, then
+paste this over the sketch and press Run, then flip the button's **Pressed** parameter in the
+Inspector:
+
+```cpp
+void setup() {
+  pinMode(2, INPUT_PULLUP);
+  pinMode(13, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(13, digitalRead(2) == LOW ? HIGH : LOW);
+}
+```
+
+The button pulls `D2` to GND and the chip's **internal pull-up** holds it high when released,
+so `INPUT_PULLUP` works with no external resistor. `digitalRead` reads the *solved* net
+voltage — a real round trip through the circuit, one frame of latency.
+
 ## Status / roadmap
 
 | Phase | Scope                                  | Status |
@@ -87,7 +108,7 @@ void loop() {
 | P3    | Blink end-to-end (in-browser Arduino C++ compile) | done   |
 | P4a   | Analog devices, models and inspector params | done   |
 | P4b   | Digital peripherals (displays, shift registers, keypads) | done   |
-| P4c   | Input devices (buttons, keypads, analog sensors) | –      |
+| P4c   | Input devices (buttons, keypads, analog sensors) | done   |
 | P5    | Pico simulation                         | –      |
 
 ## Conventional Commits

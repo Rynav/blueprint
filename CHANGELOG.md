@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to this project. Generated from Conventional Commits.
+## [0.7.0] - 2026-10-18
+
+### Documentation
+- (**examples**) add a no-code 74HC595 LED bar graph sample
+
+
+### Features
+- (**avr**) close the simulation loop with readable input pins and ADC
+- (**circuit**) model the chip's internal pull-up and the SPDT slide switch
+- shortcut: the pull-up is a fixed 30k to an ideal 5 V, with no Vcc or temperature variation. The slide switch swaps throws instantaneously, with no break-before-make gap.
+- (**ui**) wire input feedback into the run loop and let the button be pressed
+- shortcut: input feedback lands one frame (16 ms) after the CPU ran, so a sketch cannot see its own input change within the same frame.
+
+
+### Tests
+- (**input**) round-trip suites plus a button example
+
 ## [0.6.0] - 2026-10-18
 
 ### Features
