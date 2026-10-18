@@ -31,22 +31,27 @@ interface Scene {
   defs: Map<string, PartDef>
 }
 
-async function open(jsonPath: string, source: string): Promise<Scene> {
-  const diagram = parse(await Bun.file(jsonPath).text())
+async function openDiagram(diagram: Diagram, source: string): Promise<Scene> {
   const board = diagram.parts.find((p) => defs.get(p.def)?.mcu)
-  if (!board) throw new Error(`${jsonPath} has no board`)
+  if (!board) throw new Error('diagram has no board')
   const def = defs.get(board.def)
-  if (!def) throw new Error(`${jsonPath} references unknown board`)
+  if (!def) throw new Error('diagram references an unknown board')
   const runtime = createAvrRuntime(board, def)
   const { hex } = await compileSketchInline(source)
   runtime.load(hex)
   return { diagram, boardId: board.id, runtime, state: new Map(), defs }
 }
 
+async function open(jsonPath: string, source: string): Promise<Scene> {
+  return openDiagram(parse(await Bun.file(jsonPath).text()), source)
+}
+
 /** Exactly the app's frame ordering. */
 function step(scene: Scene): CircuitState {
   scene.runtime.runFor(FRAME)
-  const harness = createDeviceHarness(scene.diagram, scene.defs, scene.state)
+  // Duty over the frame just run: this is what makes a PWM pin dim rather than flicker.
+  const duty = scene.runtime.pinDuty()
+  const harness = createDeviceHarness(scene.diagram, scene.defs, scene.state, duty)
   const livePins = scene.runtime.pinValues()
   harness.seed(livePins)
   for (const t of scene.runtime.drainTransitions()) {
@@ -56,7 +61,7 @@ function step(scene: Scene): CircuitState {
 
   const prefix = `${scene.boardId}:`
   const pullUps = new Set(scene.runtime.pullUps().filter((k) => k.startsWith(prefix)))
-  const circuit = simulate(scene.diagram, scene.defs, pins, { pullUps })
+  const circuit = simulate(scene.diagram, scene.defs, pins, { pullUps, duty })
 
   const feedback = feedbackFromCircuit(scene.diagram, scene.defs, circuit.volts)
   for (const [key, level] of feedback.digital) {
@@ -156,6 +161,44 @@ void loop() {
   const again = run(40)
   console.log(`  released again: LED ${ledBrightness(again).toFixed(3)}\n`)
   ok('button-led: releasing it turns the LED off again', ledBrightness(again) < 0.02)
+}
+
+// ----------------------------------------------------------- analogWrite fade
+// Verifies the app's duty plumbing end to end: runtime.pinDuty() -> harness -> solve.
+{
+  const fadeDiagram: Diagram = {
+    version: 1,
+    parts: [
+      { id: 'uno', def: 'arduino-uno', at: { x: 0, y: 0 }, rotation: 0 },
+      { id: 'gnd', def: 'rail-gnd', at: { x: 320, y: 0 }, rotation: 0 },
+      { id: 'r1', def: 'resistor', at: { x: 120, y: 0 }, rotation: 0 },
+      { id: 'l1', def: 'led', at: { x: 220, y: 0 }, rotation: 0 },
+    ],
+    wires: [
+      { id: 'w1', from: { part: 'uno', pin: 'd9' }, to: { part: 'r1', pin: '1' } },
+      { id: 'w2', from: { part: 'r1', pin: '2' }, to: { part: 'l1', pin: 'a' } },
+      { id: 'w3', from: { part: 'l1', pin: 'k' }, to: { part: 'gnd', pin: 'GND' } },
+    ],
+    notes: [],
+  }
+  const fadeSketch = (n: number) => `#include <Arduino.h>
+void setup() { pinMode(9, OUTPUT); analogWrite(9, ${n}); }
+void loop() { delay(100); }
+`
+  const brightnessAt = async (n: number) => {
+    const scene = await openDiagram(fadeDiagram, fadeSketch(n))
+    let circuit!: CircuitState
+    for (let i = 0; i < 30; i++) circuit = step(scene)
+    return circuit.brightness['l1'] ?? 0
+  }
+  const off = await brightnessAt(0)
+  const half = await brightnessAt(128)
+  const full = await brightnessAt(255)
+  console.log(`\n  analogWrite fade: N=0 -> ${off.toFixed(4)}, N=128 -> ${half.toFixed(4)}, N=255 -> ${full.toFixed(4)}\n`)
+
+  ok('fade: analogWrite(9, 0) leaves the LED dark', off < 0.02)
+  ok('fade: analogWrite(9, 255) lights it fully', full > 0.5)
+  ok('fade: half duty dims the LED', half > 0.02 && half < full)
 }
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
