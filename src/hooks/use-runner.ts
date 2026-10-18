@@ -4,6 +4,7 @@ import { createAvrRuntime } from '@/lib/avr/runtime'
 import { simulate } from '@/lib/circuit'
 import { compileSketch } from '@/lib/compile'
 import { createDeviceHarness } from '@/lib/devices'
+import { feedbackFromCircuit } from '@/lib/inputs'
 import { allPartDefs, getPartDef } from '@/lib/parts'
 import type { PartRenderState } from '@/lib/types'
 import { useDiagram } from '@/store/diagram'
@@ -78,7 +79,23 @@ export function useRunner() {
         // Analog state is only solved once per frame: intermediate solves are invisible at
         // 60 fps, and the merge below already carries the devices' final outputs.
         const pins = harness.settle(livePins, FRAME_MICROS)
-        const circuit = simulate(diagram, defs, pins)
+
+        // Inputs: the chip's internal pull-ups are part of the circuit, so tell the solve
+        // which pins have one active before it runs.
+        const pullUps = new Set(runtime.pullUps().filter((key) => key.startsWith(`${board.id}:`)))
+        const circuit = simulate(diagram, defs, pins, { pullUps })
+
+        // Close the loop: hand the solved net voltages back to the CPU as pin levels. This
+        // lands one frame late (16 ms) — the CPU has already run for this frame.
+        // shortcut: one-frame input latency; run a short second slice inside the frame if a
+        // sketch ever needs to see its own input change within the same frame.
+        const feedback = feedbackFromCircuit(diagram, defs, circuit.volts)
+        for (const [key, level] of feedback.digital) {
+          if (key.startsWith(`${board.id}:`)) runtime.setInputPin(key.slice(board.id.length + 1), level)
+        }
+        for (const [key, volts] of feedback.analog) {
+          if (key.startsWith(`${board.id}:`)) runtime.setAnalogPin(key.slice(board.id.length + 1), volts)
+        }
 
         const partState: Record<string, PartRenderState> = {}
         for (const [id, brightness] of Object.entries(circuit.brightness)) partState[id] = { brightness }

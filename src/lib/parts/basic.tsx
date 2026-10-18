@@ -112,6 +112,7 @@ const pushbutton: PartDef = {
     ['1a', '1b'],
     ['2a', '2b'],
   ],
+  defaultParams: { pressed: 0 },
   render: () => (
     <>
       <line x1={0} y1={15} x2={18} y2={15} stroke={LINE} strokeWidth={1.2} />
@@ -150,6 +151,7 @@ const slideSwitch: PartDef = {
   category: 'switches',
   width: 60,
   height: 30,
+  defaultParams: { position: 0 },
   pins: [
     { id: '1', label: '1', x: 10, y: 30, kind: 'passive' },
     { id: '2', label: '2', x: 30, y: 30, kind: 'passive' },
