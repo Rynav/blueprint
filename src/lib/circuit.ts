@@ -34,6 +34,10 @@ const FULL_BRIGHTNESS_AMPS = 0.02
 const PIN_OHMS = 30
 /** Thevenin source voltage of a pin driven to logic 1. */
 const PIN_HIGH_VOLTS = 5
+/** Chip-internal pull-up: the datasheet's typical 20-50 kΩ, taken at ~30 kΩ. */
+// shortcut: a fixed 30 kΩ to an ideal 5 V, so pull-up strength does not vary with Vcc or
+// temperature; upgrade if a design's divider accuracy depends on it.
+const PULLUP_OHMS = 30_000
 /** Default GMIN resistance: 1 GΩ. */
 const GMIN_OHMS = 1e9
 /** Rails/battery are single- or two-pin; these are their pin ids where they matter. */
@@ -82,7 +86,7 @@ export function simulate(
   diagram: Diagram,
   defs: Map<string, PartDef>,
   pinValues: Map<string, 0 | 1 | 'z'>,
-  options?: { gminOhms?: number },
+  options?: { gminOhms?: number; pullUps?: Set<string> },
 ): CircuitState {
   const gmin = options?.gminOhms ?? GMIN_OHMS
   const nets = buildNets(diagram, defs)
@@ -152,6 +156,22 @@ export function simulate(
           const b = netOf(part.id, y)
           if (a === undefined || b === undefined) continue
           add({ kind: 'switch', a, b, closed: (params.pressed ?? 0) === 1 }, part.id)
+        }
+        break
+      }
+      case 'slide-switch': {
+        // SPDT: the common is pin 2. Below mid-travel it throws to pin 1, above to pin 3.
+        // shortcut: a mechanical break-before-make gap is not modelled; the two throws
+        // swap instantaneously at position 0.5.
+        const common = netOf(part.id, '2')
+        const throw1 = netOf(part.id, '1')
+        const throw3 = netOf(part.id, '3')
+        const toThird = (params.position ?? 0) >= 0.5
+        if (common !== undefined && throw1 !== undefined) {
+          add({ kind: 'switch', a: common, b: throw1, closed: !toThird }, part.id)
+        }
+        if (common !== undefined && throw3 !== undefined) {
+          add({ kind: 'switch', a: common, b: throw3, closed: toThird }, part.id)
         }
         break
       }
@@ -278,6 +298,25 @@ export function simulate(
     const mid = `#pin${pinCounter++}` // may not collide with a real net id (n0, n1, ...)
     add({ kind: 'voltage', a: mid, b: ground, volts: value === 1 ? PIN_HIGH_VOLTS : 0 }, null)
     add({ kind: 'resistor', a: mid, b: net, ohms: PIN_OHMS }, partId)
+  }
+
+  // Internal pull-ups: for each pin the chip has pulled up, a ~30 kΩ resistor from its net to
+  // a private ideal 5 V node. This is what makes `INPUT_PULLUP` read high with a switch to GND.
+  const pullUps = options?.pullUps
+  if (pullUps && pullUps.size > 0) {
+    const vcc = '#vcc' // `#`-prefixed, like the solver's internal nodes, so it cannot collide
+    const netsPulled = new Set<string>()
+    for (const key of pullUps) {
+      const at = key.indexOf(':')
+      if (at < 0) continue
+      const net = netOf(key.slice(0, at), key.slice(at + 1))
+      if (net === undefined) continue // unknown part/pin or a dangling pin: skip
+      netsPulled.add(net)
+    }
+    if (netsPulled.size > 0) {
+      add({ kind: 'voltage', a: vcc, b: ground, volts: 5 }, null)
+      for (const net of netsPulled) add({ kind: 'resistor', a: vcc, b: net, ohms: PULLUP_OHMS }, null)
+    }
   }
 
   // GMIN: a 1 GΩ resistor from every net to ground. The standard SPICE trick — it keeps a
